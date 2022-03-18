@@ -1,27 +1,30 @@
 
 #include <algorithm>
 #include <asio.hpp>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <string>
 #include "config.hxx"
+#include "FeederManager.hxx"
 #include "WiFiManager.hxx"
 #include "GCodeServer.hxx"
 #include "Utils.hxx"
+#include "SocInfo.hxx"
 
 static constexpr const char *const TAG = "main";
 static constexpr const char *const CMD_IMPL_TAG = "command";
 
 static WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
+static FeederManager feeder_mgr;
 
 extern "C" void app_main()
 {
     configure_log_levels();
 
     ESP_LOGI(TAG, "Esp32SlottedFeeder v0.0 Initializing");
-    ESP_LOGI(TAG, "Banks:%zu, Feeders per bank:%zu, Total Feeders:%zu",
-        FEEDER_BANK_COUNT, MAX_FEEDERS_PER_BANK, TOTAL_FEEDER_COUNT);
+    SocInfo::print_soc_info();
 
     // Initialize NVS before we do any other initialization as it may be
     // internally used by various components even if we disable it's usage in
@@ -48,6 +51,7 @@ extern "C" void app_main()
 
     asio::io_context io_context;
     GCodeServer server(io_context);
+    feeder_mgr.start(server);
 
     server.register_command("M115",
         [](std::vector<std::string> args)
@@ -55,17 +59,29 @@ extern "C" void app_main()
             ESP_LOGI(CMD_IMPL_TAG, "Received M115 command, sending reply");
             return "ok FIRMWARE_NAME:Esp32SlottedFeeder Controller PROTOCOL_VERSION:1.0 MACHINE_TYPE:Esp32SlottedFeeder\n";
         });
-    server.register_command("M600",
-        [](std::vector<std::string> args)
+
+    // Create a timer that fires roughly every 30 seconds to report heap usage
+    asio::system_timer heap_timer(io_context, std::chrono::seconds(30));
+    std::function<void(asio::error_code)> heap_monitor =
+    [&](asio::error_code ec)
+    {
+        static constexpr const char * const TAG = "heap_mon";
+        if (!ec)
         {
-            ESP_LOGI(CMD_IMPL_TAG, "Received M600 command, sending reply");
-            return "ok\n";
-        });
-    server.register_command("M600",
-        [](std::vector<std::string> args)
-        {
-            ESP_LOGI(CMD_IMPL_TAG, "Received M600 command, sending reply");
-            return "ok\n";
-        });
+            ESP_LOGI(TAG, "Heap: %.2fkB / %.2fkB",
+                    heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024.0f,
+                    heap_caps_get_total_size(MALLOC_CAP_INTERNAL) / 1024.0f);
+#if CONFIG_SPIRAM_SUPPORT
+            ESP_LOGI(TAG, "PSRAM: %.2fkB / %.2fkB",
+                heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024.0f,
+                heap_caps_get_total_size(MALLOC_CAP_SPIRAM) / 1024.0f);
+#endif // CONFIG_SPIRAM_SUPPORT
+            heap_timer.expires_from_now(std::chrono::seconds(30));
+            heap_timer.async_wait(heap_monitor);
+        }
+    };
+    // start the heap monitor timer
+    heap_monitor({});
+
     io_context.run();
 }
