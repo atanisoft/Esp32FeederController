@@ -8,6 +8,6 @@ set(IDF_DEPS
     vfs)
 
 idf_component_register(
-    SRCS main.cpp WiFiManager.cpp SocInfo.cpp
+    SRCS main.cpp WiFiManager.cpp SocInfo.cpp FeederManager.cpp GCodeServer.cpp
     REQUIRES "${IDF_DEPS}"
 )

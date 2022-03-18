@@ -101,7 +101,6 @@ static inline void configure_log_levels()
       {.tag = "*", .level = ESP_LOG_ERROR},
       {.tag = "main", .level = ESP_LOG_INFO},
       {.tag = "heap_mon", .level = ESP_LOG_INFO},
-      {.tag = "command", .level = ESP_LOG_INFO},
       {.tag = "gcode_server", .level = ESP_LOG_INFO},
       {.tag = "gcode_client", .level = ESP_LOG_INFO},
       {.tag = "wifi_mgr", .level = ESP_LOG_INFO},

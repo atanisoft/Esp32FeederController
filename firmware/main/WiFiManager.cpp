@@ -1,4 +1,5 @@
 
+#include <esp_netif_types.h>
 #include "WiFiManager.hxx"
 
 WiFiManager::WiFiManager(const char *const ssid, const char *const password,
@@ -189,4 +190,11 @@ void WiFiManager::process_idf_event(void *ctx, esp_event_base_t event_base,
         // Clear the flag that indicates we have an IPv4 address.
         xEventGroupClearBits(wifi_mgr->wifiStatus_, WIFI_GOTIP_BIT);
     }
+}
+
+esp_ip4_addr_t WiFiManager::get_local_ip()
+{
+    esp_netif_ip_info_t ip_info;
+    ESP_ERROR_CHECK(esp_netif_get_ip_info(staIface_, &ip_info));
+    return ip_info.ip;
 }

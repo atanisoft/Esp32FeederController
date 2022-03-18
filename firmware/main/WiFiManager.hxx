@@ -13,6 +13,10 @@ class WiFiManager
 {
 public:
     /// Constructor.
+    ///
+    /// @param ssid SSID to connect to.
+    /// @param password Password to use for connecting to @param ssid.
+    /// @param hostname Hostname to assign to this device.
     WiFiManager(const char * const ssid, const char * const password,
                 const char * const hostname);
 
@@ -36,6 +40,10 @@ public:
     static void process_idf_event(void *ctx, esp_event_base_t event_base,
                                   int32_t event_id, void *event_data);
 
+
+    /// @returns Currently assigned IP address.
+    esp_ip4_addr_t get_local_ip();
+
 private:
     /// Log tag to use for this class.
     static constexpr const char * TAG = "wifi_mgr";
@@ -57,11 +65,16 @@ private:
     /// Interval at which to check the status of the WiFi connection.
     static constexpr TickType_t CONNECTION_CHECK_INTERVAL = pdMS_TO_TICKS(5000);
 
+    /// SSID to connect to.
     const std::string ssid_;
+
+    /// Password to use for connecting to @ref ssid_.
     const std::string password_;
+
+    /// Hostname to assign to this device.
     const std::string hostname_;
 
-    /// 
+    /// ESP Station network interface in use.
     esp_netif_t *staIface_;
     
     /// Internal event group used to track the IP assignment events.
@@ -69,4 +82,5 @@ private:
 
     /// Bit mask used for checking WiFi connection process events.
     uint32_t wifiConnectBitMask_{WIFI_CONNECTED_BIT};
+
 };

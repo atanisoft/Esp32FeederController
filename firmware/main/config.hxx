@@ -12,5 +12,5 @@ static constexpr const char * const WIFI_PASSWORD = "";
 static constexpr const char * const WIFI_HOSTNAME = "esp32feeder";
 
 /// Number of banks of feeders to configure, each bank can hold up to 48 feeders.
-static constexpr size_t FEEDER_BANK_COUNT = 2;
+static constexpr std::size_t FEEDER_BANK_COUNT = 2;
 

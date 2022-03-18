@@ -230,8 +230,6 @@ uint8_t SocInfo::print_soc_info()
         chip_info.features & CHIP_FEATURE_BLE ? "Yes" : "No",
         chip_info.features & CHIP_FEATURE_BT ? "Yes" : "No");
 
-    ESP_LOGI(TAG, "App running from: %s",
-        esp_ota_get_running_partition()->label);
     if (reset_reason != orig_reset_reason)
     {
         ESP_LOGW(TAG, "Reset reason mismatch: %d vs %d", reset_reason,
