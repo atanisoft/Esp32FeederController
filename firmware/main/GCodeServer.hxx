@@ -21,9 +21,6 @@ class GCodeServer
     using dispatcher_type = std::map<std::string, command_handler>;
 
 public:
-    GCodeServer(const GCodeServer &) = delete;
-    GCodeServer &operator=(const GCodeServer &) = delete;
-
     GCodeServer(asio::io_context &io_context, uint16_t port = DEFAULT_PORT);
 
     void start(esp_ip4_addr_t local_addr);
@@ -42,6 +39,9 @@ private:
 
     /// Prefix for responses that contain a failure.
     static constexpr const char *const COMMAND_ERROR = "error";
+
+    GCodeServer(const GCodeServer &) = delete;
+    GCodeServer &operator=(const GCodeServer &) = delete;
 
     /// TCP/IP listener that handles accepting new clients.
     tcp::acceptor acceptor_;

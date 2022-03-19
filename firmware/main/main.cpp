@@ -16,13 +16,11 @@
 
 static constexpr const char *const TAG = "main";
 
-static WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
-static FeederManager feeder_mgr;
-
 extern "C" void app_main()
 {
     const esp_app_desc_t *app_data = esp_ota_get_app_description();
     const esp_partition_t *running_from = esp_ota_get_running_partition();
+    WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
 
     configure_log_levels();
 
@@ -57,8 +55,9 @@ extern "C" void app_main()
 
     asio::io_context io_context;
     GCodeServer server(io_context);
+    FeederManager feeder_mgr(server);
+
     server.start(wifi.get_local_ip());
-    feeder_mgr.start(server);
 
     // Create a timer that fires roughly every 30 seconds to report heap usage
     asio::system_timer heap_timer(io_context, std::chrono::seconds(30));
