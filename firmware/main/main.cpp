@@ -4,6 +4,7 @@
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>
+#include <esp_pthread.h>
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <string>
@@ -14,17 +15,37 @@
 #include "Utils.hxx"
 #include "SocInfo.hxx"
 
-static constexpr const char *const TAG = "main";
+static WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
+
+static void worker_task(asio::io_context &context)
+{
+    const char *const TAG = "worker";
+    try
+    {
+        context.run();
+    }
+    catch (const std::exception &e)
+    {
+        ESP_LOGE(TAG, "Exception occured during client thread execution %s",
+                 e.what());
+    }
+    catch (...)
+    {
+        ESP_LOGE(TAG, "Unknown exception");
+    }
+}
 
 extern "C" void app_main()
 {
     const esp_app_desc_t *app_data = esp_ota_get_app_description();
     const esp_partition_t *running_from = esp_ota_get_running_partition();
-    WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
+    const char *const TAG = "main";
+    esp_chip_info_t chip_info;
 
+    esp_chip_info(&chip_info);
     configure_log_levels();
 
-    ESP_LOGI(TAG, "Esp32SlottedFeeder v0.0 Initializing");
+    ESP_LOGI(TAG, "%s %s Initializing", app_data->project_name, app_data->version);
     ESP_LOGI(TAG, "Compiled on %s %s using IDF %s", app_data->date,
              app_data->time, app_data->idf_ver);
     ESP_LOGI(TAG, "Running from: %s", running_from->label);
@@ -53,25 +74,21 @@ extern "C" void app_main()
         abort();
     }
 
-    asio::io_context io_context;
-    GCodeServer server(io_context);
-    FeederManager feeder_mgr(server);
-
-    server.start(wifi.get_local_ip());
-
-    // Create a timer that fires roughly every 30 seconds to report heap usage
-    asio::system_timer heap_timer(io_context, std::chrono::seconds(30));
+    asio::io_context context;
+    GCodeServer gcode_server(context, wifi.get_local_ip());
+    FeederManager feeder_mgr(gcode_server);
+    asio::system_timer heap_timer(context, std::chrono::seconds(30));
     std::function<void(asio::error_code)> heap_monitor =
         [&](asio::error_code ec)
     {
-        static constexpr const char *const TAG = "heap_mon";
+        const char *const HEAP_TAG = "heap_mon";
         if (!ec)
         {
-            ESP_LOGI(TAG, "Heap: %.2fkB / %.2fkB",
+            ESP_LOGI(HEAP_TAG, "Heap: %.2fkB / %.2fkB",
                      heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024.0f,
                      heap_caps_get_total_size(MALLOC_CAP_INTERNAL) / 1024.0f);
 #if CONFIG_SPIRAM_SUPPORT
-            ESP_LOGI(TAG, "PSRAM: %.2fkB / %.2fkB",
+            ESP_LOGI(HEAP_TAG, "PSRAM: %.2fkB / %.2fkB",
                      heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024.0f,
                      heap_caps_get_total_size(MALLOC_CAP_SPIRAM) / 1024.0f);
 #endif // CONFIG_SPIRAM_SUPPORT
@@ -79,8 +96,33 @@ extern "C" void app_main()
             heap_timer.async_wait(heap_monitor);
         }
     };
-    // start the heap monitor timer
+
+    // start the heap monitor task, this is necessary to kick start the task
+    // in the background.
     heap_monitor({});
 
-    io_context.run();
+    std::vector<std::thread> workers;
+    ESP_LOGI(TAG, "Creating %d worker threads", chip_info.cores);
+    for (int id = 0; id < chip_info.cores; id++)
+    {
+        // std::thread does not expose options for thread name, stack size or
+        // pinning to a core. ESP-IDF provides a pthread extension for this
+        // which must be called prior to thread creation.
+        auto cfg = esp_pthread_get_default_config();
+        std::string name = "worker-";
+        name.append(std::to_string(id));
+        cfg.thread_name = name.c_str();
+        cfg.pin_to_core = id;
+        esp_pthread_set_cfg(&cfg);
+
+        // Create the worker thread which passes in the asio::io_context by
+        // reference. Internally the asio::io_context object will manage
+        // locking as required.
+        workers.emplace_back(std::thread(worker_task, std::ref(context)));
+    }
+    ESP_LOGI(TAG, "%s Ready!", app_data->project_name);
+    for (auto &worker : workers)
+    {
+        worker.join();
+    }
 }

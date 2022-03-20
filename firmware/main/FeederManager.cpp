@@ -1,4 +1,6 @@
 
+#include <asio.hpp>
+#include <asio/bind_executor.hpp>
 #include <esp_log.h>
 #include <cstdint>
 #include <nvs.h>
@@ -81,7 +83,7 @@ FeederManager::FeederManager(GCodeServer &server)
 
 template <typename T>
 bool FeederManager::extract_arg(string arg_letter,
-                                FeederManager::cmd_args args,
+                                GCodeServer::command_args args,
                                 T &value)
 {
     auto ent = std::find_if(args.begin(), args.end(),
@@ -100,7 +102,7 @@ bool FeederManager::extract_arg(string arg_letter,
     return false;
 }
 
-FeederManager::cmd_reply FeederManager::feeder_move(FeederManager::cmd_args args)
+GCodeServer::command_return_type FeederManager::feeder_move(GCodeServer::command_args args)
 {
     ESP_LOGI(TAG, "feeder move request received");
     uint8_t bank = -1, feeder = -1;
@@ -116,7 +118,7 @@ FeederManager::cmd_reply FeederManager::feeder_move(FeederManager::cmd_args args
     return banks_[bank]->move(feeder);
 }
 
-FeederManager::cmd_reply FeederManager::feeder_post_pick(FeederManager::cmd_args args)
+GCodeServer::command_return_type FeederManager::feeder_post_pick(GCodeServer::command_args args)
 {
     ESP_LOGI(TAG, "feeder post pick request received");
     uint8_t bank = -1, feeder = -1;
@@ -132,7 +134,7 @@ FeederManager::cmd_reply FeederManager::feeder_post_pick(FeederManager::cmd_args
     return banks_[bank]->post_pick(feeder);
 }
 
-FeederManager::cmd_reply FeederManager::feeder_status(FeederManager::cmd_args args)
+GCodeServer::command_return_type FeederManager::feeder_status(GCodeServer::command_args args)
 {
     ESP_LOGI(TAG, "feeder status request received");
     uint8_t bank = -1, feeder = -1;
@@ -148,7 +150,7 @@ FeederManager::cmd_reply FeederManager::feeder_status(FeederManager::cmd_args ar
     return banks_[bank]->status(feeder);
 }
 
-FeederManager::cmd_reply FeederManager::feeder_group_configure(FeederManager::cmd_args args)
+GCodeServer::command_return_type FeederManager::feeder_group_configure(GCodeServer::command_args args)
 {
     ESP_LOGI(TAG, "feeder group reconfigure request received");
     uint8_t bank = -1, pca9685_a = -1, pca9685_b = -1;
@@ -179,7 +181,7 @@ FeederManager::cmd_reply FeederManager::feeder_group_configure(FeederManager::cm
                                    pca9685_b_freq);
 }
 
-FeederManager::cmd_reply FeederManager::feeder_configure(FeederManager::cmd_args args)
+GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::command_args args)
 {
     ESP_LOGI(TAG, "feeder reconfigure request received");
     uint8_t bank = -1, feeder = -1;
@@ -311,7 +313,7 @@ bool FeederManager::FeederBank::load_configuration()
     return ready;
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::retract(uint8_t feeder)
+GCodeServer::command_return_type FeederManager::FeederBank::retract(uint8_t feeder)
 {
     std::size_t channel = feeder % PCA9685::NUM_CHANNELS;
     std::size_t pca9685_idx = feeder / PCA9685::NUM_CHANNELS;
@@ -346,7 +348,7 @@ FeederManager::cmd_reply FeederManager::FeederBank::retract(uint8_t feeder)
     return std::make_pair(true, "");
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::move(uint8_t feeder)
+GCodeServer::command_return_type FeederManager::FeederBank::move(uint8_t feeder)
 {
     std::size_t channel = feeder % PCA9685::NUM_CHANNELS;
     std::size_t pca9685_idx = feeder / PCA9685::NUM_CHANNELS;
@@ -389,24 +391,24 @@ FeederManager::cmd_reply FeederManager::FeederBank::move(uint8_t feeder)
     return std::make_pair(true, "");
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::post_pick(uint8_t feeder)
+GCodeServer::command_return_type FeederManager::FeederBank::post_pick(uint8_t feeder)
 {
     return std::make_pair(true, "");
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::status(uint8_t feeder)
+GCodeServer::command_return_type FeederManager::FeederBank::status(uint8_t feeder)
 {
     return std::make_pair(true, "");
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::configure(uint8_t feeder,
-                                                              uint8_t advance_angle,
-                                                              uint8_t half_advance_angle,
-                                                              uint8_t retract_angle,
-                                                              uint8_t feed_length,
-                                                              uint8_t settle_time,
-                                                              uint8_t min_pulse,
-                                                              uint8_t max_pulse)
+GCodeServer::command_return_type FeederManager::FeederBank::configure(uint8_t feeder,
+                                                                      uint8_t advance_angle,
+                                                                      uint8_t half_advance_angle,
+                                                                      uint8_t retract_angle,
+                                                                      uint8_t feed_length,
+                                                                      uint8_t settle_time,
+                                                                      uint8_t min_pulse,
+                                                                      uint8_t max_pulse)
 {
     if (feed_length % 2)
     {
@@ -415,10 +417,10 @@ FeederManager::cmd_reply FeederManager::FeederBank::configure(uint8_t feeder,
     return std::make_pair(true, "");
 }
 
-FeederManager::cmd_reply FeederManager::FeederBank::configure(uint8_t pca9685_a,
-                                                              uint8_t pca9685_b,
-                                                              uint32_t pca9685_a_freq,
-                                                              uint32_t pca9685_b_freq)
+GCodeServer::command_return_type FeederManager::FeederBank::configure(uint8_t pca9685_a,
+                                                                      uint8_t pca9685_b,
+                                                                      uint32_t pca9685_a_freq,
+                                                                      uint32_t pca9685_b_freq)
 {
     return std::make_pair(true, "");
 }

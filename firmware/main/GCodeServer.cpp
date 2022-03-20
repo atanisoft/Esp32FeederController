@@ -10,13 +10,11 @@
 #include "GCodeServer.hxx"
 #include "Utils.hxx"
 
-GCodeServer::GCodeServer(asio::io_context &io_context, uint16_t port)
+GCodeServer::GCodeServer(asio::io_context &io_context,
+                         const esp_ip4_addr_t local_addr,
+                         const uint16_t port)
     : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
       clientManager_()
-{
-}
-
-void GCodeServer::start(esp_ip4_addr_t local_addr)
 {
     auto endpoint = acceptor_.local_endpoint();
     ESP_LOGI(TAG, "Waiting for connections on " IPSTR ":%d...",
@@ -24,7 +22,8 @@ void GCodeServer::start(esp_ip4_addr_t local_addr)
     do_accept();
 }
 
-void GCodeServer::register_command(std::string const &command, command_handler &&method)
+void GCodeServer::register_command(std::string const &command,
+                                   command_handler &&method)
 {
     dispatcher_.emplace(command, std::move(method));
 }

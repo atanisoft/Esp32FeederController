@@ -100,6 +100,7 @@ static inline void configure_log_levels()
   {
       {.tag = "*", .level = ESP_LOG_ERROR},
       {.tag = "main", .level = ESP_LOG_INFO},
+      {.tag = "worker", .level = ESP_LOG_INFO},
       {.tag = "I2Cbus", .level = ESP_LOG_INFO},
       {.tag = "PCA9685", .level = ESP_LOG_INFO},
       {.tag = "feeder_mgr", .level = ESP_LOG_INFO},

@@ -5,6 +5,7 @@ set(IDF_DEPS
     esp_system
     heap
     nvs_flash
+    pthread
     vfs)
 
 idf_component_register(

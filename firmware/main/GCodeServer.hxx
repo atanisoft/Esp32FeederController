@@ -11,21 +11,28 @@
 
 class GCodeServer
 {
+public:
+
+    using command_args = std::vector<std::string> const &;
+    using command_return_type = std::pair<bool, std::string>;
+
+private:
     using tcp = asio::ip::tcp;
 
     /// Type used for the command handlers
-    using command_handler =
-        std::function<std::pair<bool, std::string>(std::vector<std::string> const &)>;
+    using command_handler = std::function<command_return_type(command_args)>;
 
     /// Type for the command dispatcher collection.
     using dispatcher_type = std::map<std::string, command_handler>;
 
 public:
-    GCodeServer(asio::io_context &io_context, uint16_t port = DEFAULT_PORT);
 
-    void start(esp_ip4_addr_t local_addr);
+    GCodeServer(asio::io_context &io_context,
+                const esp_ip4_addr_t local_addr,
+                const uint16_t port = DEFAULT_PORT);
 
-    void register_command(std::string const &command, command_handler &&method);
+    void register_command(std::string const &command,
+                          command_handler &&method);
 
 private:
     /// Log tag to use for this class.
@@ -70,7 +77,6 @@ private:
         /// @param client @ref GCodeClient to register and start.
         void start(std::shared_ptr<GCodeClient> client);
 
-        
         /// Stops a @ref GCodeClient and cleans up resources.
         ///
         /// @param client @ref GCodeClient to stop and cleanup.
@@ -143,14 +149,14 @@ private:
         ///
         /// @param error When non-zero an error occurred, otherwise the read
         /// can be considered successful.
-        /// @param size Number of bytes received from the remote client. 
+        /// @param size Number of bytes received from the remote client.
         void on_read(asio::error_code error, std::size_t size);
 
         /// Callback for write completion.
         ///
         /// @param error When non-zero an error occurred, otherwise the write
         /// can be considered successful.
-        /// @param size Number of bytes sent to the remote client. 
+        /// @param size Number of bytes sent to the remote client.
         void on_write(asio::error_code error, std::size_t size);
 
         /// Processes a single command line received from the remote client.

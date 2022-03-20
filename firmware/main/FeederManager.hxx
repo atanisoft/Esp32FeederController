@@ -6,8 +6,7 @@
 #include "config.hxx"
 #include "I2Cbus.hxx"
 #include "PCA9685.hxx"
-
-class GCodeServer;
+#include "GCodeServer.hxx"
 
 /// Manages all connected Feeders.
 ///
@@ -18,9 +17,6 @@ class GCodeServer;
 /// The maximum number of banks can be defined in config.hxx.
 class FeederManager
 {
-    using cmd_reply = std::pair<bool, std::string>;
-    using cmd_args = std::vector<std::string> const &;
-
 public:
     /// Constructor.
     ///
@@ -77,27 +73,27 @@ private:
         /// default configuration settings will be generated.
         bool load_configuration();
 
-        FeederManager::cmd_reply retract(uint8_t feeder);
+        GCodeServer::command_return_type retract(uint8_t feeder);
 
-        FeederManager::cmd_reply move(uint8_t feeder);
+        GCodeServer::command_return_type move(uint8_t feeder);
 
-        FeederManager::cmd_reply post_pick(uint8_t feeder);
+        GCodeServer::command_return_type post_pick(uint8_t feeder);
 
-        FeederManager::cmd_reply status(uint8_t feeder);
+        GCodeServer::command_return_type status(uint8_t feeder);
 
-        FeederManager::cmd_reply configure(uint8_t feeder,
-                                           uint8_t advance_angle,
-                                           uint8_t half_advance_angle,
-                                           uint8_t retract_angle,
-                                           uint8_t feed_length,
-                                           uint8_t settle_time,
-                                           uint8_t min_pulse,
-                                           uint8_t max_pulse);
+        GCodeServer::command_return_type configure(uint8_t feeder,
+                                                   uint8_t advance_angle,
+                                                   uint8_t half_advance_angle,
+                                                   uint8_t retract_angle,
+                                                   uint8_t feed_length,
+                                                   uint8_t settle_time,
+                                                   uint8_t min_pulse,
+                                                   uint8_t max_pulse);
 
-        FeederManager::cmd_reply configure(uint8_t pca9685_a,
-                                           uint8_t pca9685_b,
-                                           uint32_t pca9685_a_freq,
-                                           uint32_t pca9685_b_freq);
+        GCodeServer::command_return_type configure(uint8_t pca9685_a,
+                                                   uint8_t pca9685_b,
+                                                   uint32_t pca9685_a_freq,
+                                                   uint32_t pca9685_b_freq);
 
     private:
         /// Log tag to use for this class.
@@ -129,7 +125,7 @@ private:
 
         /// Default maximum number of pulses to send the servo.
         static constexpr uint16_t DEFAULT_MAX_PULSE_COUNT = 600;
-        
+
         typedef struct
         {
             uint8_t pca9685_address[PCA965_COUNT];
@@ -172,13 +168,13 @@ private:
             FEEDER_DISABLED,
 
             /// Feeder is IDLE.
-		    FEEDER_IDLE,
+            FEEDER_IDLE,
 
             /// Feeder is currently moving.
-		    FEEDER_MOVING,
+            FEEDER_MOVING,
 
             /// Feeder is currently moving.
-		    FEEDER_RETRACTING            
+            FEEDER_RETRACTING
         } status_[MAX_FEEDERS_PER_BANK];
 
         enum feeder_position_t : uint8_t
@@ -187,14 +183,15 @@ private:
             POSITION_UNKNOWN,
 
             /// Feeder position is fully advanced.
-		    POSITION_ADVANCED_FULL,
+            POSITION_ADVANCED_FULL,
 
             /// Feeder position is half way advanced.
             POSITION_ADVANCED_HALF,
 
             /// Feeder position is retracted.
-		    POSITION_RETRACT
-        } position_[MAX_FEEDERS_PER_BANK], target_[MAX_FEEDERS_PER_BANK];
+            POSITION_RETRACT
+        } position_[MAX_FEEDERS_PER_BANK],
+            target_[MAX_FEEDERS_PER_BANK];
 
         int16_t movement_[MAX_FEEDERS_PER_BANK];
     };
@@ -224,7 +221,8 @@ private:
     /// NOTE: @param arg can be more than one character but typically will be
     /// a single character string.
     template <typename T>
-    bool extract_arg(std::string arg, cmd_args args, T &value);
+    bool extract_arg(std::string arg, GCodeServer::command_args args,
+                     T &value);
 
     /// Handles the request to move a feeder (M610).
     ///
@@ -232,7 +230,7 @@ private:
     /// @return status of the request.
     ///
     /// Command format: M610 T{bank} N{feeder}
-    cmd_reply feeder_move(cmd_args args);
+    GCodeServer::command_return_type feeder_move(GCodeServer::command_args args);
 
     /// Handles the post-pick action for a feeder (M611).
     ///
@@ -240,7 +238,7 @@ private:
     /// @return status of the request.
     ///
     /// Command format: M611 T{bank} N{feeder}
-    cmd_reply feeder_post_pick(cmd_args args);
+    GCodeServer::command_return_type feeder_post_pick(GCodeServer::command_args args);
 
     /// Handles the status request for a feeder (M612).
     ///
@@ -248,7 +246,7 @@ private:
     /// @return status of the request.
     ///
     /// Command format: M612 T{bank} N{feeder}
-    cmd_reply feeder_status(cmd_args args);
+    GCodeServer::command_return_type feeder_status(GCodeServer::command_args args);
 
     /// Handles the configur request for a feeder (M613).
     ///
@@ -257,7 +255,7 @@ private:
     ///
     /// Command format: M613 T{bank} A{pca9865 #1 address} B{pca9865 #2 address}
     ///                 C{pca9865 #1 PWM frequency} D{pca9865 #2 PWM frequency}
-    cmd_reply feeder_group_configure(cmd_args args);
+    GCodeServer::command_return_type feeder_group_configure(GCodeServer::command_args args);
 
     /// Handles the configur request for a feeder (M614).
     ///
@@ -267,5 +265,5 @@ private:
     /// Command format: M614 T{bank} N{feeder} A{advance angle}
     ///                 B{half advance angle} C{retract angle}
     ///                 F{feed lenght} U{settle time} V{min pulse} W{max pulse}
-    cmd_reply feeder_configure(cmd_args args);
+    GCodeServer::command_return_type feeder_configure(GCodeServer::command_args args);
 };
