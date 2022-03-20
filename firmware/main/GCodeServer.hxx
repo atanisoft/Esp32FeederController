@@ -27,7 +27,7 @@ private:
 
 public:
 
-    GCodeServer(asio::io_context &io_context,
+    GCodeServer(asio::io_context &context,
                 const esp_ip4_addr_t local_addr,
                 const uint16_t port = DEFAULT_PORT);
 
@@ -36,16 +36,16 @@ public:
 
 private:
     /// Log tag to use for this class.
-    static constexpr const char *TAG = "gcode_server";
+    static constexpr const char * const TAG = "gcode_server";
 
     /// Port number to listen on for incoming connections from OpenPnP.
     static constexpr uint16_t DEFAULT_PORT = 8989;
 
     /// Prefix for responses that are successful.
-    static constexpr const char *const COMMAND_OK = "ok";
+    static constexpr const char * const COMMAND_OK = "ok";
 
     /// Prefix for responses that contain a failure.
-    static constexpr const char *const COMMAND_ERROR = "error";
+    static constexpr const char * const COMMAND_ERROR = "error";
 
     GCodeServer(const GCodeServer &) = delete;
     GCodeServer &operator=(const GCodeServer &) = delete;
@@ -66,11 +66,8 @@ private:
     class GCodeClientManager
     {
     public:
-        GCodeClientManager(const GCodeClientManager &) = delete;
-        GCodeClientManager &operator=(const GCodeClientManager &) = delete;
-
         /// Constructor.
-        GCodeClientManager();
+        GCodeClientManager(asio::io_context &context);
 
         /// Registers and starts a @ref GCodeClient.
         ///
@@ -83,8 +80,22 @@ private:
         void stop(std::shared_ptr<GCodeClient> client);
 
     private:
+        /// Log tag to use for this class.
+        static constexpr const char * const TAG = "gcode_client_mgr";
+
         /// Collection of connected clients.
         std::set<std::shared_ptr<GCodeClient>> clients_;
+
+        /// Timer used for periodic reporting of client status.
+        asio::system_timer timer_;
+
+        /// Reports connected client count and status.
+        ///
+        /// @param ec @ref asio::error_code status.
+        void report_client_count(const asio::error_code &ec);
+
+        GCodeClientManager(const GCodeClientManager &) = delete;
+        GCodeClientManager &operator=(const GCodeClientManager &) = delete;
     } clientManager_;
 
     /// Client implementation that processes incoming GCode commands.

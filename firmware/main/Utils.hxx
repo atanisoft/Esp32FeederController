@@ -107,6 +107,7 @@ static inline void configure_log_levels()
       {.tag = "feeder_bank", .level = ESP_LOG_INFO},
       {.tag = "heap_mon", .level = ESP_LOG_INFO},
       {.tag = "gcode_server", .level = ESP_LOG_INFO},
+      {.tag = "gcode_client_mgr", .level = ESP_LOG_INFO},
       {.tag = "gcode_client", .level = ESP_LOG_INFO},
       {.tag = "wifi_mgr", .level = ESP_LOG_INFO},
       {.tag = "feeder_mgr", .level = ESP_LOG_INFO},

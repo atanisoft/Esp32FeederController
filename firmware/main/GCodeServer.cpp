@@ -10,11 +10,11 @@
 #include "GCodeServer.hxx"
 #include "Utils.hxx"
 
-GCodeServer::GCodeServer(asio::io_context &io_context,
+GCodeServer::GCodeServer(asio::io_context &context,
                          const esp_ip4_addr_t local_addr,
                          const uint16_t port)
-    : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
-      clientManager_()
+    : acceptor_(context, tcp::endpoint(tcp::v4(), port)),
+      clientManager_(context)
 {
     auto endpoint = acceptor_.local_endpoint();
     ESP_LOGI(TAG, "Waiting for connections on " IPSTR ":%d...",
@@ -48,8 +48,10 @@ void GCodeServer::do_accept()
         });
 }
 
-GCodeServer::GCodeClientManager::GCodeClientManager()
+GCodeServer::GCodeClientManager::GCodeClientManager(asio::io_context &context)
+    : timer_(context, std::chrono::seconds(1))
 {
+    report_client_count({});
 }
 
 void GCodeServer::GCodeClientManager::start(std::shared_ptr<GCodeClient> client)
@@ -62,6 +64,18 @@ void GCodeServer::GCodeClientManager::stop(std::shared_ptr<GCodeClient> client)
 {
     clients_.erase(client);
     client->stop();
+}
+
+void GCodeServer::GCodeClientManager::report_client_count(const asio::error_code &ec)
+{
+    if (!ec)
+    {
+        ESP_LOGI(TAG, "%zu clients connected", clients_.size());
+        timer_.expires_from_now(std::chrono::seconds(30));
+        timer_.async_wait(
+            std::bind(&GCodeServer::GCodeClientManager::report_client_count,
+                      this, std::placeholders::_1));
+    }
 }
 
 GCodeServer::GCodeClient::GCodeClient(tcp::socket &&socket,
@@ -118,6 +132,8 @@ void GCodeServer::GCodeClient::on_read(asio::error_code error, std::size_t size)
     }
     else if (error != asio::error::operation_aborted)
     {
+        ESP_LOGE(CLIENT_TAG, "[%s] Read was unsuccessful: %s (%d)",
+                 peer_.c_str(), error.message().c_str(), error.value());
         manager_.stop(shared_from_this());
     }
 }
@@ -126,15 +142,22 @@ void GCodeServer::GCodeClient::on_write(asio::error_code error, std::size_t size
 {
     if (!error)
     {
+        ESP_LOGD(CLIENT_TAG, "[%s] Write successful", peer_.c_str());
         outgoing_.pop();
 
         if (!outgoing_.empty())
         {
             write();
         }
+        else
+        {
+            read();
+        }
     }
     else if (error != asio::error::operation_aborted)
     {
+        ESP_LOGE(CLIENT_TAG, "[%s] Write was unsuccessful: %s (%d)",
+                 peer_.c_str(), error.message().c_str(), error.value());
         manager_.stop(shared_from_this());
     }
 }
@@ -149,7 +172,7 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
 
     std::string reply;
 
-    ESP_LOGD(CLIENT_TAG, "[%s] Command:%s", peer_.c_str(), command.c_str());
+    ESP_LOGI(CLIENT_TAG, "[%s] Command:%s", peer_.c_str(), command.c_str());
 
     if (auto it = dispatcher_.find(command); it != dispatcher_.cend())
     {
@@ -164,10 +187,13 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
     }
     else
     {
-        if (command.at(0) == 'G')
+        if (command.at(0) == 'G' || command == "M82" ||
+            command == "M204" || command == "M400")
         {
-            // If the command is G??? discard it
+            // automatic discard of certain commands that are not implemented
+            // or needed with the feeder.
             reply = COMMAND_OK;
+            reply.append(" ; not implemented");
         }
         else if (command == "M115")
         {
@@ -182,7 +208,7 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
         }
         else
         {
-            reply = "error: invalid command token: ";
+            reply = "error invalid command token: ";
             reply.append(command);
         }
     }
