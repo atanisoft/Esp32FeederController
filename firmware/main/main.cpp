@@ -76,7 +76,7 @@ extern "C" void app_main()
 
     asio::io_context context;
     GCodeServer gcode_server(context, wifi.get_local_ip());
-    FeederManager feeder_mgr(gcode_server);
+    FeederManager feeder_mgr(gcode_server, context);
     asio::system_timer heap_timer(context, std::chrono::seconds(30));
     std::function<void(asio::error_code)> heap_monitor =
         [&](asio::error_code ec)
@@ -102,8 +102,10 @@ extern "C" void app_main()
     heap_monitor({});
 
     std::vector<std::thread> workers;
-    ESP_LOGI(TAG, "Creating %d worker threads", chip_info.cores);
-    for (int id = 0; id < chip_info.cores; id++)
+    // Create two workers per core to increase concurrency of execution.
+    const int worker_count = chip_info.cores * 2;
+    ESP_LOGI(TAG, "Creating %d worker threads", worker_count);
+    for (int id = 0; id < worker_count; id++)
     {
         // std::thread does not expose options for thread name, stack size or
         // pinning to a core. ESP-IDF provides a pthread extension for this
@@ -121,6 +123,8 @@ extern "C" void app_main()
         workers.emplace_back(std::thread(worker_task, std::ref(context)));
     }
     ESP_LOGI(TAG, "%s Ready!", app_data->project_name);
+
+    // Wait for all workers to exit.
     for (auto &worker : workers)
     {
         worker.join();

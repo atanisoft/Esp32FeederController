@@ -5,6 +5,24 @@
 #include <esp_log.h>
 #include <locale>
 
+/// Helper which encodes an integer type to a hex string.
+///
+/// @param w integer to convert
+/// @param hex_len size of hex encoded string (automatically sized).
+///
+/// @return hex encoded string.
+template <typename I>
+std::string to_hex(I w, size_t hex_len = sizeof(I) << 1)
+{
+    static const char *digits = "0123456789ABCDEF";
+    std::string rc(hex_len, '0');
+    for (size_t i = 0, j = (hex_len - 1) * 4; i < hex_len; ++i, j -= 4)
+    {
+        rc[i] = digits[(w >> j) & 0x0F];
+    }
+    return rc;
+}
+
 /// Helper method to break a string into a pair<string, string> based on a delimeter.
 ///
 /// @param str is the string to break.
@@ -104,7 +122,7 @@ static inline void configure_log_levels()
       {.tag = "I2Cbus", .level = ESP_LOG_INFO},
       {.tag = "PCA9685", .level = ESP_LOG_INFO},
       {.tag = "feeder_mgr", .level = ESP_LOG_INFO},
-      {.tag = "feeder_bank", .level = ESP_LOG_INFO},
+      {.tag = "feeder", .level = ESP_LOG_INFO},
       {.tag = "heap_mon", .level = ESP_LOG_INFO},
       {.tag = "gcode_server", .level = ESP_LOG_INFO},
       {.tag = "gcode_client_mgr", .level = ESP_LOG_INFO},
