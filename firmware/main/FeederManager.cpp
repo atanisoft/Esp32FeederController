@@ -62,31 +62,54 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
     ESP_LOGI(TAG, "Initializing I2C Bus");
     i2c_.begin(I2C_SDA_PIN_NUM, I2C_SCL_PIN_NUM, I2C_BUS_SPEED);
 
-    uint8_t addr = PCA9685_BASE_ADDRESS;
-    for (std::size_t idx = 0;
+    for (uint8_t addr = PCA9685_BASE_ADDRESS;
          addr < (PCA9685_BASE_ADDRESS + MAX_PCA9685_COUNT);
-         idx++, addr++)
+         addr++)
     {
         if (i2c_.testConnection(addr) == ESP_OK)
         {
             pca9685_.push_back(std::make_shared<PCA9685>(i2c_));
-            if (pca9685_[idx]->configure(addr, PCA9685_FREQUENCY) != ESP_OK)
+            if (pca9685_.back()->configure(addr, PCA9685_FREQUENCY) != ESP_OK)
             {
-                ESP_LOGW(TAG, "PCA9685 %02x configuration failed!", addr);
+                ESP_LOGW(TAG, "PCA9685(%02x) configuration failed!", addr);
                 pca9685_.pop_back();
             }
             else
             {
-                ESP_LOGI(TAG, "PCA9685(%02x, %p) detected!", addr,
-                         pca9685_[idx].get());
+                ESP_LOGI(TAG, "PCA9685(%02x/%p) configured for use.", addr,
+                         pca9685_.back().get());
             }
         }
         else
         {
-            ESP_LOGW(TAG, "PCA9685 %02x not detected.", addr);
+            ESP_LOGW(TAG, "PCA9685(%02x) was not detected.", addr);
         }
     }
     ESP_LOGI(TAG, "Detected PCA9685 devices:%zu", pca9685_.size());
+
+    for (uint8_t addr = MCP23017_BASE_ADDRESS;
+         addr < (MCP23017_BASE_ADDRESS + MAX_MCP23017_COUNT);
+         addr++)
+    {
+        if (i2c_.testConnection(addr) == ESP_OK)
+        {
+            mcp23017_.push_back(std::make_shared<MCP23017>(i2c_, context));
+            if (mcp23017_.back()->configure(addr) != ESP_OK)
+            {
+                ESP_LOGW(TAG, "MCP23017(%02x) configuration failed!", addr);
+                mcp23017_.pop_back();
+            }
+            else
+            {
+                ESP_LOGI(TAG, "MCP23017(%02x/%p) configured for use.", addr,
+                         mcp23017_.back().get());
+            }
+        }
+        else
+        {
+            ESP_LOGW(TAG, "MCP23017(%02x) was not detected!", addr);
+        }
+    }
 
     // calculate how many feeders we should configured based on the the number
     // of PCA9685 chips that were detected and configured.
@@ -94,13 +117,24 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
         std::min(MAX_FEEDER_COUNT, pca9685_.size() * PCA9685::NUM_CHANNELS);
     for (size_t idx = 0; idx < available_feeder_count; idx++)
     {
-        auto pca9685_index = idx / PCA9685::NUM_CHANNELS;
-        auto pca9685_channel = idx % PCA9685::NUM_CHANNELS;
+        auto expander_index = idx / PCA9685::NUM_CHANNELS;
+        auto expander_channel = idx % PCA9685::NUM_CHANNELS;
         uint32_t uuid = config.feeder_uuid[idx];
-        feeders_.push_back(
-            std::make_shared<Feeder>(idx + 1, uuid,
-                                     pca9685_[pca9685_index], pca9685_channel,
-                                     context));
+        if (mcp23017_.size() > expander_index)
+        {
+            feeders_.push_back(
+                std::make_shared<Feeder>(idx + 1, uuid,
+                                        pca9685_[expander_index],
+                                        mcp23017_[expander_index],
+                                        expander_channel, context));
+        }
+        else
+        {
+            feeders_.push_back(
+                std::make_shared<Feeder>(idx + 1, uuid,
+                                        pca9685_[expander_index],
+                                        expander_channel, context));
+        }
     }
     ESP_LOGI(TAG, "Configured Feeders:%zu", feeders_.size());
 }

@@ -13,17 +13,41 @@
 #include "Utils.hxx"
 
 Feeder::Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-               uint8_t pca9685_channel, asio::io_context &context)
-    : id_(id), uuid_(uuid), pca9685_(pca9685),
-      pca9685_channel_(pca9685_channel), timer_(context)
+               std::shared_ptr<MCP23017> mcp23017, uint8_t channel,
+               asio::io_context &context)
+    : id_(id), uuid_(uuid), pca9685_(pca9685), mcp23017_(mcp23017),
+      channel_(channel), timer_(context)
+{
+    configure();
+}
+
+Feeder::Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
+               uint8_t channel, asio::io_context &context)
+    : id_(id), uuid_(uuid), pca9685_(pca9685), channel_(channel),
+      timer_(context)
+{
+    configure();
+}
+
+void Feeder::configure()
 {
     size_t config_size = sizeof(feeder_config_t);
     nvs_handle_t nvs;
     std::string nvs_key = "feeder-";
     nvs_key.append(to_hex(uuid_));
 
-    ESP_LOGI(TAG, "[%zu/%s] Initializing using PCA9685 %p:%d", id_,
-             to_hex(uuid_).c_str(), pca9685_.get(), pca9685_channel_);
+    ESP_LOGI(TAG,
+             "[%zu/%s] Initializing using PCA9685 %p:%d", id_,
+             to_hex(uuid_).c_str(), pca9685_.get(), channel_);
+    if (mcp23017_)
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feedback enabled using MCP23017 %p:%d", id_,
+                 to_hex(uuid_).c_str(), mcp23017_.get(), channel_);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feedback disabled", id_, to_hex(uuid_).c_str());
+    }
 
     ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
 

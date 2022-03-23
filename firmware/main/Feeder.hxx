@@ -5,18 +5,29 @@
 
 #include "config.hxx"
 #include "PCA9685.hxx"
+#include "MCP23017.hxx"
 #include "GCodeServer.hxx"
 
-class Feeder  : public std::enable_shared_from_this<Feeder>
+class Feeder : public std::enable_shared_from_this<Feeder>
 {
 public:
     /// Constructor.
     ///
-    /// @param uuid Unique identifier for this feeder bank.
+    /// @param uuid Unique identifier for this feeder.
     /// @param pca9685 @ref PCA9685 to use for this feeder.
-    /// @param pca9685_channel @ref PCA9685 channel assigned to this feeder.
+    /// @param mcp23017 @ref MCP23017 to use for this feeder.
+    /// @param channel @ref IO Expander channel assigned to this feeder.
     Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-           uint8_t pca9685_channel, asio::io_context &context);
+           std::shared_ptr<MCP23017> mcp23017, uint8_t channel,
+           asio::io_context &context);
+
+    /// Constructor.
+    ///
+    /// @param uuid Unique identifier for this feeder.
+    /// @param pca9685 @ref PCA9685 to use for this feeder.
+    /// @param channel @ref IO Expander channel assigned to this feeder.
+    Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
+           uint8_t channel, asio::io_context &context);
 
     GCodeServer::command_return_type retract();
 
@@ -92,13 +103,16 @@ private:
     /// Unique ID for this feeder.
     const uint32_t uuid_;
 
-    /// PCA9685 instances to use for this bank.
+    /// PCA9685 instance to use for this feeder.
     std::shared_ptr<PCA9685> pca9685_;
 
-    /// PCA9685 channel for this feeder.
-    const uint8_t pca9685_channel_;
+    /// MCP23017 instance to use for this feeder.
+    std::shared_ptr<MCP23017> mcp23017_;
 
-    /// Configuration for this bank.
+    /// IO Expander channel for this feeder.
+    const uint8_t channel_;
+
+    /// Configuration for this feeder.
     feeder_config_t config_;
 
     /// last known status of this feeder.
@@ -108,6 +122,8 @@ private:
     feeder_position_t target_{POSITION_UNKNOWN};
     int16_t movement_{0};
     asio::system_timer timer_;
+
+    void configure();
 
     void update(asio::error_code error);
 };

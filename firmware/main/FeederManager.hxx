@@ -6,6 +6,7 @@
 #include "config.hxx"
 #include "I2Cbus.hxx"
 #include "PCA9685.hxx"
+#include "MCP23017.hxx"
 #include "GCodeServer.hxx"
 #include "Feeder.hxx"
 
@@ -49,6 +50,18 @@ private:
     /// NVS key to use for the @ref FeederManager configuration.
     static constexpr const char *const NVS_FEEDER_MGR_CFG_KEY = "mgr_cfg";
 
+    /// Base address to start from when searching for PCA9685 devices.
+    static constexpr uint8_t PCA9685_BASE_ADDRESS = 0x40;
+
+    /// Maximum number of PCA9685 devices to search for.
+    static constexpr std::size_t MAX_PCA9685_COUNT = 8;
+
+    /// Base address to start from when searching for MCP23017 devices.
+    static constexpr uint8_t MCP23017_BASE_ADDRESS = 0x20;
+
+    /// Maximum number of MCP23017 devices to search for.
+    static constexpr std::size_t MAX_MCP23017_COUNT = 8;
+
     /// Maximum number of feeders to configure.
     static constexpr std::size_t MAX_FEEDER_COUNT =
         MAX_PCA9685_COUNT * PCA9685::NUM_CHANNELS;
@@ -62,8 +75,11 @@ private:
     /// I2C instance used for managing feeders.
     I2C_t &i2c_;
 
-    /// Collection of PCA9685 devices used for the feeders.
+    /// Collection of PCA9685 devices used by the feeders for servo control.
     std::vector<std::shared_ptr<PCA9685>> pca9685_;
+
+    /// Collection of MCP23017 devices used by the feeders for feedback.
+    std::vector<std::shared_ptr<MCP23017>> mcp23017_;
 
     /// Collection of feeders.
     std::vector<std::shared_ptr<Feeder>> feeders_;
