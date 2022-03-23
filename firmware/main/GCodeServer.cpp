@@ -197,14 +197,17 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
         }
         else if (command == "M115")
         {
-            const esp_app_desc_t *app_data = esp_ota_get_app_description();
             // If the command is M115 send back firmware details.
-            reply = COMMAND_OK;
+            // NOTE: For M115 the "ok" ACK should be at the end of the string
+            // rather than the front!
+            const esp_app_desc_t *app_data = esp_ota_get_app_description();
             reply.reserve(128);
             reply.append(" ");
             reply.append("FIRMWARE_NAME:Esp32SlottedFeeder (");
             reply.append(app_data->version);
-            reply.append(")");
+            reply.append(") ");
+            reply.append(COMMAND_OK);
+
         }
         else
         {
