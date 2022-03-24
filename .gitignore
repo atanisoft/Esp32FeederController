@@ -1,6 +1,8 @@
 firmware/build
 firmware/sdkconfig
 firmware/sdkconfig.old
+pcb/_autosave*
+pcb/*.kicad_sche
 .clang_complete
 .gcc-flags.json
 .vscode
