@@ -186,6 +186,10 @@ GCodeServer::command_return_type FeederManager::feeder_move(GCodeServer::command
     {
         return std::make_pair(false, "Feeder is busy!");
     }
+    else if (!feeders_[feeder]->is_tensioned())
+    {
+        return std::make_pair(false, "Tape cover does not appear to be tensioned correctly!");
+    }
     else if (!feeders_[feeder]->move(distance))
     {
         return std::make_pair(false, "Feeder reported an error!");
@@ -270,6 +274,7 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
 {
     ESP_LOGI(TAG, "feeder reconfigure request received");
     uint8_t feeder = -1;
+    int8_t feedback_enabled = -1;
     int16_t advance_angle = 0, half_advance_angle = 0, retract_angle = 0;
     uint16_t feed_length = 0, settle_time = 0, min_pulse = 0, max_pulse = 0;
 
@@ -287,9 +292,11 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
     extract_arg("U", args, settle_time);
     extract_arg("V", args, min_pulse);
     extract_arg("W", args, max_pulse);
+    extract_arg("Z", args, feedback_enabled);
+    
     feeders_[feeder]->configure(advance_angle, half_advance_angle,
                                 retract_angle, feed_length, settle_time,
-                                min_pulse, max_pulse);
+                                min_pulse, max_pulse, feedback_enabled);
 
     return std::make_pair(true, feeders_[feeder]->status());
 }

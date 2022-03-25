@@ -10,7 +10,16 @@ At this time the following feeder designs should work:
 * [Original 0816 Feeder](https://docs.mgrl.de/maschine:pickandplace:feeder:0816feeder).
 * [0816 Lumen Feeder](https://github.com/SupaCoder/0816-Lumen-SMT-Feeder-Remix).
 
-## Programming the Esp32FeederController
+### Feeder modifications / Addons
+
+* [Reel holder](https://www.thingiverse.com/thing:3810696)
+* [Vertical tape puller](https://github.com/SebG3D/TapePuller/wiki)
+
+## Non-automatic feeders
+
+* [Lumen Push/Pull Feeder](https://github.com/GatCode/LumenPPF)
+
+# Configuring and building the Esp32FeederController
 
 Esp32FeederController is built using [ESP-IDF](https://github.com/espressif/esp-idf),
 most testing is done with the master branch (v5.0 or later) but earlier stable
@@ -52,7 +61,7 @@ I (2114) gcode_server: Waiting for connections on 10.0.0.13:8989...
 Make note of the IP address that is reported as you will need it for OpenPnP
 configuration.
 
-## Adding Esp32FeederController to OpenPnP
+# Adding Esp32FeederController to OpenPnP
 
 Adding Esp32FeederController to OpenPnP consists of three steps:
 
@@ -133,3 +142,57 @@ Both operate similarly using the `Actuators` defined above.
 * In the `File` menu select `Save Configuration` to ensure settings are not lost when restarting OpenPnP.
 
 Use the `Test Feed` and `Test post pick` to confirm the feeder is responding correctly.
+
+## Supported Gcode commands
+
+The Esp32FeederController supports multiple Gcode commands, many of which are
+not directly used by OpenPnP. Many of the commands are intended to be used with
+substitution of values within `{ }` marks, anything within `[ ]` are optional
+arguments.
+
+### Feeder Movement (M610)
+
+`M610 N{feeder} [D{distance}]`
+
+* `{feeder}` is the Feeder to be moved forward.
+* `{distance}` is the distance to move the feeder and is optional.
+
+### Feeder Post Pick (M611)
+
+`M611 N{feeder}`
+
+* `{feeder}` is the Feeder to be moved as part of post-pick.
+
+### Feeder Status (M612)
+
+`M612 N{feeder}`
+
+* `{feeder}` is the Feeder to retrieve status for.
+
+### Feeder Configuration (M613)
+
+`M613 N{feeder} [A{advance angle}] [B{half advance angle}] [C{retract angle}] [F{feed length}] [U{settle time}] [V{min pulse}] [W{max pulse}] [Z{feedback enabled}]`
+
+All parameters except `{feeder}` are optional.
+
+* `{feeder}` is the Feeder to be configured.
+* `{advance angle}` is the angle to move the servo to for full extension.
+* `{half advance angle}` is the angle to move the servo to for half extension.
+* `{retract angle}` is the angle to move the servo to for retraction.
+* `{feed length}` is the number of millimeters (pitch) to move the feeder forward when moving to the next part and must be a multiple of 2.
+* `{settle time}` is the number of milliseconds to delay between servo movements.
+* `{min pulse}` is the minimum number of pulses to send the servo.
+* `{max pulse}` is the maximum number of pulses to send the servo.
+* `{feedback enabled}` is used to enable or disable feedback checking as part of movement, set to zero to disable or one to enable.
+
+### Enable Feeder (M614)
+
+`M614 N{feeder}`
+
+* `{feeder}` is the Feeder to enable.
+
+### Disable Feeder (M615)
+
+`M615 N{feeder}`
+
+* `{feeder}` is the Feeder to disable.

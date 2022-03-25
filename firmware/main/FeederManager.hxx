@@ -153,6 +153,7 @@ private:
     /// Command format: M613 N{feeder} A{advance angle}
     ///                 B{half advance angle} C{retract angle}
     ///                 F{feed length} U{settle time} V{min pulse} W{max pulse}
+    ///                 Z{feedback enabled}
     GCodeServer::command_return_type feeder_configure(GCodeServer::command_args args);
 
     /// Utility method which waits for a specific feeder to reach a stopped

@@ -79,9 +79,13 @@ public:
     /// again.
     /// @param min_pulse Minimum number of pulses to send.
     /// @param max_pulse Maximum number of pulses to send.
+    /// @param ignore_feedback When set to zero the feedback sensor will not
+    /// be checked, when set to 1 (or higher) the feedback sensor will be
+    /// checked.
     void configure(uint8_t advance_angle, uint8_t half_advance_angle,
                    uint8_t retract_angle, uint8_t feed_length,
-                   uint8_t settle_time, uint8_t min_pulse, uint8_t max_pulse);
+                   uint8_t settle_time, uint8_t min_pulse, uint8_t max_pulse,
+                   int8_t ignore_feedback);
 
     /// @return true if the feeder is processing a previous action, false
     /// otherwise.
@@ -92,6 +96,13 @@ public:
 
     /// @return true if the feeder is currently moving, false otherwise.
     bool is_moving();
+
+    /// Checks the feedback input from the feeder.
+    ///
+    /// @return true if the feedback sensor indicates the tape is sufficiently
+    /// tensioned, false otherwise. If the feedback sensor is not in use this
+    /// will always return true.
+    bool is_tensioned();
 
 private:
     /// Log tag to use for this class.
@@ -125,8 +136,11 @@ private:
         /// Maximum number of pulses to send the servo as part of movement.
         uint16_t servo_max_pulse;
 
+        /// When set to non-zero the feedback sensor will be ignored.
+        uint8_t ignore_feedback;
+
         /// Reserved space for expansion.
-        uint8_t reserved[128];
+        uint8_t reserved[127];
     } feeder_config_t;
 
     /// Feeder status definitions.

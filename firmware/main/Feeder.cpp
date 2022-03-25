@@ -36,26 +36,13 @@ void Feeder::configure()
     std::string nvs_key = "feeder-";
     nvs_key.append(to_hex(uuid_));
 
-    ESP_LOGI(TAG,
-             "[%zu/%s] Initializing using PCA9685 %p:%d", id_,
-             to_hex(uuid_).c_str(), pca9685_.get(), channel_);
-    if (mcp23017_)
-    {
-        ESP_LOGI(TAG, "[%zu/%s] Feedback enabled using MCP23017 %p:%d", id_,
-                 to_hex(uuid_).c_str(), mcp23017_.get(), channel_);
-    }
-    else
-    {
-        ESP_LOGI(TAG, "[%zu/%s] Feedback disabled", id_, to_hex(uuid_).c_str());
-    }
-
     ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
     esp_err_t res = nvs_get_blob(nvs, nvs_key.c_str(), &config_, &config_size);
     if (config_size != sizeof(feeder_config_t) || res != ESP_OK)
     {
         ESP_LOGW(TAG,
-                 "[%zu/%s] Configuration not found or corrupt, rebuilding..",
-                 id_, to_hex(uuid_).c_str());
+                 "[%s:%zu] Configuration not found or corrupt, rebuilding..",
+                 to_hex(uuid_).c_str(), id_);
 
         memset(&config_, 0, sizeof(feeder_config_t));
 
@@ -67,12 +54,27 @@ void Feeder::configure()
         config_.servo_min_pulse = DEFAULT_FEEDER_MIN_PULSE_COUNT;
         config_.servo_max_pulse = DEFAULT_FEEDER_MAX_PULSE_COUNT;
 
+        // If the MCP23017 was not provided ignore feedback by default.
+        if (!mcp23017_)
+        {
+            config_.ignore_feedback = 1;
+        }
+
         ESP_ERROR_CHECK(
             nvs_set_blob(nvs, nvs_key.c_str(), &config_,
                          sizeof(feeder_config_t)));
         ESP_ERROR_CHECK(nvs_commit(nvs));
     }
     nvs_close(nvs);
+
+    ESP_LOGI(TAG,
+             "[%s:%zu] Initializing using PCA9685 %p:%d",
+             to_hex(uuid_).c_str(), id_, pca9685_.get(), channel_);
+    if (mcp23017_ && !config_.ignore_feedback)
+    {
+        ESP_LOGI(TAG, "[%s:%zu] Feedback enabled using MCP23017 %p:%d",
+                 to_hex(uuid_).c_str(), id_, mcp23017_.get(), channel_);
+    }
 
     // move the feeder to retracted position.
     {
@@ -87,8 +89,8 @@ bool Feeder::move(uint8_t distance)
     if (is_moving())
     {
         ESP_LOGW(TAG,
-                 "[%zu/%s] Feeder is already in motion, rejecting move.",
-                 id_, to_hex(uuid_).c_str());
+                 "[%s:%zu] Feeder is already in motion, rejecting move.",
+                 to_hex(uuid_).c_str(), id_);
         return false;
     }
 
@@ -137,6 +139,7 @@ std::string Feeder::status()
     status.append(" W").append(std::to_string(config_.servo_max_pulse));
     status.append(" X").append(std::to_string(position_));
     status.append(" Y").append(std::to_string(status_));
+    status.append(" Z").append(std::to_string(config_.ignore_feedback));    
     return status;
 }
 
@@ -157,34 +160,57 @@ bool Feeder::disable()
 void Feeder::configure(uint8_t advance_angle, uint8_t half_advance_angle,
                        uint8_t retract_angle, uint8_t feed_length,
                        uint8_t settle_time, uint8_t min_pulse,
-                       uint8_t max_pulse)
+                       uint8_t max_pulse, int8_t ignore_feedback)
 {
+    bool need_persist = false;
     if (advance_angle)
     {
         config_.servo_full_angle = advance_angle;
+        need_persist = true;
     }
     if (half_advance_angle)
     {
         config_.servo_half_angle = half_advance_angle;
+        need_persist = true;
     }
     if (retract_angle)
     {
         config_.servo_retract_angle = retract_angle;
+        need_persist = true;
     }
     if (feed_length)
     {
         if ((feed_length % 2) == 0)
         {
             config_.feed_length = feed_length;
+            need_persist = true;
         }
     }
     if (settle_time)
     {
         config_.settle_time = settle_time;
+        need_persist = true;
     }
     if (min_pulse)
     {
         config_.servo_min_pulse = min_pulse;
+        need_persist = true;
+    }
+    if (ignore_feedback >= 0)
+    {
+        config_.ignore_feedback = ignore_feedback;
+        need_persist = true;
+    }
+
+    if (need_persist)
+    {
+        // persist the updated configuration
+        ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
+        ESP_ERROR_CHECK(
+            nvs_set_blob(nvs, nvs_key.c_str(), &config_,
+                         sizeof(feeder_config_t)));
+        ESP_ERROR_CHECK(nvs_commit(nvs));
+        nvs_close(nvs);
     }
 }
 
@@ -203,27 +229,38 @@ bool Feeder::is_moving()
     return status_ == FEEDER_MOVING;
 }
 
+bool Feeder::is_tensioned()
+{
+    if (mcp23017_ && !config_.ignore_feedback)
+    {
+        return mcp23017_->state(channel_);
+    }
+
+    // no MCP23017 configured or feedback ignored.
+    return true;
+}
+
 void Feeder::update(asio::error_code error)
 {
     const std::lock_guard<std::mutex> lock(mux_);
 
     if (error && error != asio::error::operation_aborted)
     {
-        ESP_LOGE(TAG, "[%zu/%s] Error received from timer: %s (%d)",
-                 id_, to_hex(uuid_).c_str(), error.message().c_str(),
+        ESP_LOGE(TAG, "[%s:%zu] Error received from timer: %s (%d)",
+                 to_hex(uuid_).c_str(), id_, error.message().c_str(),
                  error.value());
     }
     else if (is_enabled() && is_moving() && movement_ > 0)
     {
-        ESP_LOGI(TAG, "[%zu/%s] Feeder movement remaining: %dmm",
-                 id_, to_hex(uuid_).c_str(), movement_);
+        ESP_LOGI(TAG, "[%s:%zu] Feeder movement remaining: %dmm",
+                 to_hex(uuid_).c_str(), id_, movement_);
         // continue moving
         move_locked();
     }
     else if (is_enabled())
     {
-        ESP_LOGI(TAG, "[%zu/%s] Feeder movement complete, turning off servo",
-                 id_, to_hex(uuid_).c_str());
+        ESP_LOGI(TAG, "[%s:%zu] Feeder movement complete, turning off servo",
+                 to_hex(uuid_).c_str(), id_);
         // disable the servo PWM signal.
         pca9685_->off(channel_);
 
@@ -243,20 +280,20 @@ void Feeder::move_locked()
 {
     if (position_ == POSITION_RETRACTED)
     {
-        ESP_LOGI(TAG, "[%zu/%s] Feeder is retracted", id_,
-                 to_hex(uuid_).c_str());
+        ESP_LOGI(TAG, "[%s:%zu] Feeder is retracted", to_hex(uuid_).c_str(),
+                 id_);
         if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH)
         {
-            ESP_LOGI(TAG, "[%zu/%s] Moving to fully advanced position",
-                    id_, to_hex(uuid_).c_str());
+            ESP_LOGI(TAG, "[%s:%zu] Moving to fully advanced position",
+                    to_hex(uuid_).c_str(), id_);
             position_ = POSITION_ADVANCED_FULL;
             movement_ -= FEEDER_MECHANICAL_ADVANCE_LENGTH;
             set_servo_angle(config_.servo_full_angle);
         }
         else if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH / 2)
         {
-            ESP_LOGI(TAG, "[%zu/%s] Moving to half advanced position",
-                    id_, to_hex(uuid_).c_str());
+            ESP_LOGI(TAG, "[%s:%zu] Moving to half advanced position",
+                    to_hex(uuid_).c_str(), id_);
             position_ = POSITION_ADVANCED_HALF;
             movement_ -= (FEEDER_MECHANICAL_ADVANCE_LENGTH / 2);
             set_servo_angle(config_.servo_half_angle);
@@ -264,12 +301,12 @@ void Feeder::move_locked()
     }
     else if (position_ == POSITION_ADVANCED_HALF)
     {
-        ESP_LOGI(TAG, "[%zu/%s] Feeder is half advanced",
-                 id_, to_hex(uuid_).c_str());
+        ESP_LOGI(TAG, "[%s:%zu] Feeder is half advanced",
+                 to_hex(uuid_).c_str(), id_);
         if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH / 2)
         {
-            ESP_LOGI(TAG, "[%zu/%s] Moving to fully advanced position",
-                    id_, to_hex(uuid_).c_str());
+            ESP_LOGI(TAG, "[%s:%zu] Moving to fully advanced position",
+                    to_hex(uuid_).c_str(), id_);
             position_ = POSITION_ADVANCED_FULL;
             movement_ -= (FEEDER_MECHANICAL_ADVANCE_LENGTH / 2);
             set_servo_angle(config_.servo_full_angle);
@@ -277,15 +314,15 @@ void Feeder::move_locked()
     }
     else if (position_ == POSITION_ADVANCED_FULL)
     {
-        ESP_LOGI(TAG, "[%zu/%s] Feeder fully advanced, retracting",
-                 id_, to_hex(uuid_).c_str());
+        ESP_LOGI(TAG, "[%s:%zu] Feeder fully advanced, retracting",
+                 to_hex(uuid_).c_str(), id_);
         retract_locked();
     }
     else
     {
         ESP_LOGE(TAG,
-                 "[%zu/%s] Feeder is not in an expect state! position: %d",
-                 id_, to_hex(uuid_).c_str(), position_);
+                 "[%s:%zu] Feeder is not in an expect state! position: %d",
+                 to_hex(uuid_).c_str(), id_, position_);
     }
 }
 
