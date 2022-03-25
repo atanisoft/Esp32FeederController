@@ -25,9 +25,9 @@ public:
     /// @param server @ref GCodeServer to register feeder commands with.
     FeederManager(GCodeServer &server, asio::io_context &context);
 
-private:
-    /// Log tag to use for this class.
-    static constexpr const char *const TAG = "feeder_mgr";
+protected:
+    // Allow @ref Feeder to access protected fields.
+    friend class Feeder;
 
     /// Command ID for moving a feeder.
     static constexpr const char *const FEEDER_MOVE_CMD = "M610";
@@ -47,6 +47,10 @@ private:
     /// Command ID for disabling a feeder.
     static constexpr const char *const FEEDER_DISABLE_CMD = "M615";
 
+private:
+    /// Log tag to use for this class.
+    static constexpr const char *const TAG = "feeder_mgr";
+
     /// NVS key to use for the @ref FeederManager configuration.
     static constexpr const char *const NVS_FEEDER_MGR_CFG_KEY = "mgr_cfg";
 
@@ -65,6 +69,9 @@ private:
     /// Maximum number of feeders to configure.
     static constexpr std::size_t MAX_FEEDER_COUNT =
         MAX_PCA9685_COUNT * PCA9685::NUM_CHANNELS;
+
+    /// Interval at which to check a feeder has completed it's async action(s).
+    static constexpr std::size_t FEEDER_ASYNC_CHECK_DELAY_MS = 50;
 
     /// Configuration parameters that are persisted.
     typedef struct
@@ -103,7 +110,7 @@ private:
     /// @param args Arguments to the command.
     /// @return status of the request.
     ///
-    /// Command format: M610 N{feeder}
+    /// Command format: M610 N{feeder} {D{distance}}
     GCodeServer::command_return_type feeder_move(GCodeServer::command_args args);
 
     /// Handles the post-pick action for a feeder (M611).
@@ -145,6 +152,12 @@ private:
     ///
     /// Command format: M613 N{feeder} A{advance angle}
     ///                 B{half advance angle} C{retract angle}
-    ///                 F{feed lenght} U{settle time} V{min pulse} W{max pulse}
+    ///                 F{feed length} U{settle time} V{min pulse} W{max pulse}
     GCodeServer::command_return_type feeder_configure(GCodeServer::command_args args);
+
+    /// Utility method which waits for a specific feeder to reach a stopped
+    /// position prior to returning.
+    ///
+    /// @param feeder Feeder ID to wait for.
+    void wait_for_feeder(std::size_t feeder);
 };

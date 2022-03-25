@@ -50,7 +50,6 @@ void Feeder::configure()
     }
 
     ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
-
     esp_err_t res = nvs_get_blob(nvs, nvs_key.c_str(), &config_, &config_size);
     if (config_size != sizeof(feeder_config_t) || res != ESP_OK)
     {
@@ -74,69 +73,228 @@ void Feeder::configure()
         ESP_ERROR_CHECK(nvs_commit(nvs));
     }
     nvs_close(nvs);
-    retract();
-}
 
-GCodeServer::command_return_type Feeder::retract()
-{
-    return std::make_pair(true, "");
-}
-
-GCodeServer::command_return_type Feeder::move()
-{
-    if (status_ == FEEDER_DISABLED)
+    // move the feeder to retracted position.
     {
-        return std::make_pair(false, "Feeder not enabled!");
+        const std::lock_guard<std::mutex> lock(mux_);
+        retract_locked();
     }
-    else if (status_ == FEEDER_MOVING)
+}
+
+bool Feeder::move(uint8_t distance)
+{
+    const std::lock_guard<std::mutex> lock(mux_);
+    if (is_moving())
     {
-        movement_ += config_.feed_length;
-        return std::make_pair(true, "");
+        ESP_LOGW(TAG,
+                 "[%zu/%s] Feeder is already in motion, rejecting move.",
+                 id_, to_hex(uuid_).c_str());
+        return false;
     }
 
-    return std::make_pair(true, "");
+    if (distance == 0)
+    {
+        movement_ = config_.feed_length;
+    }
+    else
+    {
+        movement_ = distance;
+    }
+
+    status_ = FEEDER_MOVING;
+
+    // start moving the feeder forward.
+    move_locked();
+
+    return true;
 }
 
-GCodeServer::command_return_type Feeder::post_pick()
+bool Feeder::post_pick()
 {
-    return std::make_pair(true, "");
+    if (!is_enabled())
+    {
+        return false;
+    }
+    else if (position_ != POSITION_RETRACTED)
+    {
+        const std::lock_guard<std::mutex> lock(mux_);
+        retract_locked();
+    }
+    return true;
 }
 
-GCodeServer::command_return_type Feeder::status()
+std::string Feeder::status()
 {
-    return std::make_pair(true, "");
+    std::string status = FeederManager::FEEDER_STATUS_CMD;
+    status.reserve(128);
+    status.append(" N").append(std::to_string(id_));
+    status.append(" A").append(std::to_string(config_.servo_full_angle));
+    status.append(" B").append(std::to_string(config_.servo_half_angle));
+    status.append(" C").append(std::to_string(config_.servo_retract_angle));
+    status.append(" F").append(std::to_string(config_.feed_length));
+    status.append(" U").append(std::to_string(config_.settle_time));
+    status.append(" V").append(std::to_string(config_.servo_min_pulse));
+    status.append(" W").append(std::to_string(config_.servo_max_pulse));
+    status.append(" X").append(std::to_string(position_));
+    status.append(" Y").append(std::to_string(status_));
+    return status;
 }
 
-GCodeServer::command_return_type Feeder::enable()
+bool Feeder::enable()
 {
-    return std::make_pair(true, "");
+    const std::lock_guard<std::mutex> lock(mux_);
+    status_ = FEEDER_IDLE;
+    return true;
 }
 
-GCodeServer::command_return_type Feeder::disable()
+bool Feeder::disable()
 {
-    return std::make_pair(true, "");
+    const std::lock_guard<std::mutex> lock(mux_);
+    status_ = FEEDER_DISABLED;
+    return true;
 }
 
-GCodeServer::command_return_type Feeder::configure(uint8_t advance_angle,
-                                                   uint8_t half_advance_angle,
-                                                   uint8_t retract_angle,
-                                                   uint8_t feed_length,
-                                                   uint8_t settle_time,
-                                                   uint8_t min_pulse,
-                                                   uint8_t max_pulse)
+void Feeder::configure(uint8_t advance_angle, uint8_t half_advance_angle,
+                       uint8_t retract_angle, uint8_t feed_length,
+                       uint8_t settle_time, uint8_t min_pulse,
+                       uint8_t max_pulse)
 {
-    
-    return std::make_pair(true, "");
+    if (advance_angle)
+    {
+        config_.servo_full_angle = advance_angle;
+    }
+    if (half_advance_angle)
+    {
+        config_.servo_half_angle = half_advance_angle;
+    }
+    if (retract_angle)
+    {
+        config_.servo_retract_angle = retract_angle;
+    }
+    if (feed_length)
+    {
+        if ((feed_length % 2) == 0)
+        {
+            config_.feed_length = feed_length;
+        }
+    }
+    if (settle_time)
+    {
+        config_.settle_time = settle_time;
+    }
+    if (min_pulse)
+    {
+        config_.servo_min_pulse = min_pulse;
+    }
+}
+
+bool Feeder::is_busy()
+{
+    return !is_enabled() && status_ != FEEDER_IDLE;
+}
+
+bool Feeder::is_enabled()
+{
+    return status_ != FEEDER_DISABLED;
+}
+
+bool Feeder::is_moving()
+{
+    return status_ == FEEDER_MOVING;
 }
 
 void Feeder::update(asio::error_code error)
 {
-    if (status_ != FEEDER_DISABLED)
+    const std::lock_guard<std::mutex> lock(mux_);
+
+    if (error && error != asio::error::operation_aborted)
     {
-        //if (movement_)
-        //if (position_ != target_)
+        ESP_LOGE(TAG, "[%zu/%s] Error received from timer: %s (%d)",
+                 id_, to_hex(uuid_).c_str(), error.message().c_str(),
+                 error.value());
     }
+    else if (is_enabled() && is_moving() && movement_ > 0)
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feeder movement remaining: %dmm",
+                 id_, to_hex(uuid_).c_str(), movement_);
+        // continue moving
+        move_locked();
+    }
+    else if (is_enabled())
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feeder movement complete, turning off servo",
+                 id_, to_hex(uuid_).c_str());
+        // disable the servo PWM signal.
+        pca9685_->off(channel_);
+
+        // reset the feeder status to idle.
+        status_ = FEEDER_IDLE;
+    }
+}
+
+void Feeder::retract_locked()
+{
+    status_ = FEEDER_MOVING;
+    position_ = POSITION_RETRACTED;
+    set_servo_angle(config_.servo_retract_angle);
+}
+
+void Feeder::move_locked()
+{
+    if (position_ == POSITION_RETRACTED)
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feeder is retracted", id_,
+                 to_hex(uuid_).c_str());
+        if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH)
+        {
+            ESP_LOGI(TAG, "[%zu/%s] Moving to fully advanced position",
+                    id_, to_hex(uuid_).c_str());
+            position_ = POSITION_ADVANCED_FULL;
+            movement_ -= FEEDER_MECHANICAL_ADVANCE_LENGTH;
+            set_servo_angle(config_.servo_full_angle);
+        }
+        else if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH / 2)
+        {
+            ESP_LOGI(TAG, "[%zu/%s] Moving to half advanced position",
+                    id_, to_hex(uuid_).c_str());
+            position_ = POSITION_ADVANCED_HALF;
+            movement_ -= (FEEDER_MECHANICAL_ADVANCE_LENGTH / 2);
+            set_servo_angle(config_.servo_half_angle);
+        }
+    }
+    else if (position_ == POSITION_ADVANCED_HALF)
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feeder is half advanced",
+                 id_, to_hex(uuid_).c_str());
+        if (movement_ >= FEEDER_MECHANICAL_ADVANCE_LENGTH / 2)
+        {
+            ESP_LOGI(TAG, "[%zu/%s] Moving to fully advanced position",
+                    id_, to_hex(uuid_).c_str());
+            position_ = POSITION_ADVANCED_FULL;
+            movement_ -= (FEEDER_MECHANICAL_ADVANCE_LENGTH / 2);
+            set_servo_angle(config_.servo_full_angle);
+        }
+    }
+    else if (position_ == POSITION_ADVANCED_FULL)
+    {
+        ESP_LOGI(TAG, "[%zu/%s] Feeder fully advanced, retracting",
+                 id_, to_hex(uuid_).c_str());
+        retract_locked();
+    }
+    else
+    {
+        ESP_LOGE(TAG,
+                 "[%zu/%s] Feeder is not in an expect state! position: %d",
+                 id_, to_hex(uuid_).c_str(), position_);
+    }
+}
+
+void Feeder::set_servo_angle(uint8_t angle)
+{
+    pca9685_->set_servo_angle(channel_, angle, config_.servo_min_pulse,
+                              config_.servo_max_pulse);
+    // start background timer to shut off the servo or continue
+    // movement.
     timer_.expires_from_now(std::chrono::milliseconds(config_.settle_time));
-    timer_.async_wait(std::bind(&Feeder::update, shared_from_this(),
-                                std::placeholders::_1));
+    timer_.async_wait(std::bind(&Feeder::update, this, std::placeholders::_1));
 }

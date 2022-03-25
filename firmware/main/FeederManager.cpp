@@ -164,12 +164,31 @@ GCodeServer::command_return_type FeederManager::feeder_move(GCodeServer::command
 {
     ESP_LOGI(TAG, "feeder move request received");
     uint8_t feeder = -1;
+    uint8_t distance = 0;
+
+    // optional argument to allow specifying the feed distance.
+    extract_arg("D", args, distance);
 
     if (!extract_arg("N", args, feeder) || feeder > feeders_.size())
     {
         return std::make_pair(false, "Missing/invalid feeder ID");
     }
-    return feeders_[feeder]->move();
+    else if (!feeders_[feeder]->is_enabled())
+    {
+        return std::make_pair(false, "Feeder has not been enabled!");
+    }
+    else if (feeders_[feeder]->is_busy())
+    {
+        return std::make_pair(false, "Feeder is busy!");
+    }
+    else if (!feeders_[feeder]->move(distance))
+    {
+        return std::make_pair(false, "Feeder reported an error!");
+    }
+
+    wait_for_feeder(feeder);
+
+    return std::make_pair(true, "");
 }
 
 GCodeServer::command_return_type FeederManager::feeder_post_pick(GCodeServer::command_args args)
@@ -181,7 +200,22 @@ GCodeServer::command_return_type FeederManager::feeder_post_pick(GCodeServer::co
     {
         return std::make_pair(false, "Missing/invalid feeder ID");
     }
-    return feeders_[feeder]->post_pick();
+    else if (!feeders_[feeder]->is_enabled())
+    {
+        return std::make_pair(false, "Feeder has not been enabled!");
+    }
+    else if (feeders_[feeder]->is_busy())
+    {
+        return std::make_pair(false, "Feeder is busy!");
+    }
+    else if (!feeders_[feeder]->post_pick())
+    {
+        return std::make_pair(false, "Feeder reported an error!");
+    }
+
+    wait_for_feeder(feeder);
+
+    return std::make_pair(true, "");
 }
 
 GCodeServer::command_return_type FeederManager::feeder_status(GCodeServer::command_args args)
@@ -194,7 +228,7 @@ GCodeServer::command_return_type FeederManager::feeder_status(GCodeServer::comma
         return std::make_pair(false, "Missing/invalid feeder ID");
     }
 
-    return feeders_[feeder]->status();
+    return std::make_pair(true, feeders_[feeder]->status());
 }
 
 GCodeServer::command_return_type FeederManager::feeder_enable(GCodeServer::command_args args)
@@ -205,7 +239,11 @@ GCodeServer::command_return_type FeederManager::feeder_enable(GCodeServer::comma
     {
         return std::make_pair(false, "Missing/invalid feeder ID");
     }
-    return feeders_[feeder]->enable();
+    if (feeders_[feeder]->enable())
+    {
+        return std::make_pair(true, "");
+    }
+    return std::make_pair(false, "Feeder reported an error");
 }
 
 GCodeServer::command_return_type FeederManager::feeder_disable(GCodeServer::command_args args)
@@ -216,7 +254,11 @@ GCodeServer::command_return_type FeederManager::feeder_disable(GCodeServer::comm
     {
         return std::make_pair(false, "Missing/invalid feeder ID");
     }
-    return feeders_[feeder]->disable();
+    if (feeders_[feeder]->disable())
+    {
+        return std::make_pair(true, "");
+    }
+    return std::make_pair(false, "Feeder reported an error");
 }
 
 GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::command_args args)
@@ -240,7 +282,18 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
     extract_arg("U", args, settle_time);
     extract_arg("V", args, min_pulse);
     extract_arg("W", args, max_pulse);
-    return feeders_[feeder]->configure(advance_angle, half_advance_angle,
-                                       retract_angle, feed_length, settle_time,
-                                       min_pulse, max_pulse);
+    feeders_[feeder]->configure(advance_angle, half_advance_angle,
+                                retract_angle, feed_length, settle_time,
+                                min_pulse, max_pulse);
+
+    return std::make_pair(true, feeders_[feeder]->status());
+}
+
+void FeederManager::wait_for_feeder(std::size_t feeder)
+{
+    // wait for the feeder to finish processing the request.
+    while (feeders_[feeder]->is_busy())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(FEEDER_ASYNC_CHECK_DELAY_MS));
+    }
 }

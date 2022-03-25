@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(Esp32SlottedFeeder)
+project(Esp32FeederController)
 
 ###############################################################################
 # Switch from GNU++11 to GNU++17
