@@ -135,6 +135,11 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
                                         pca9685_[expander_index],
                                         expander_channel, context));
         }
+
+        if (AUTO_ENABLE_FEEDERS)
+        {
+            feeders_.back()->enable();
+        }
     }
     ESP_LOGI(TAG, "Configured Feeders:%zu", feeders_.size());
 }

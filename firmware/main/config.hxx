@@ -12,6 +12,9 @@ static constexpr const char * const WIFI_PASSWORD = "";
 /// Hostname to assign to the device upon connection to WiFi.
 static constexpr const char * const WIFI_HOSTNAME = "esp32feeder";
 
+/// When set to true any detected feeders will automatically be enabled.
+static constexpr bool AUTO_ENABLE_FEEDERS = true;
+
 /// Default frequency to use for sending pulses to the connected servos, the
 /// value below generates an approximate 20ms pulse.
 static constexpr uint32_t PCA9685_FREQUENCY = 50;
