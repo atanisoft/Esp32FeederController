@@ -4,6 +4,10 @@ firmware/sdkconfig.old
 pcb/_autosave*
 pcb/*.kicad_sche
 pcb/FeederController/FeederController-backups/
+pcb/FeederController/Outputs
+pcb/Feeder/Feeder-backups/
+pcb/Feeder/Feeder-panel-backups/
+pcb/Feeder/Outputs
 .clang_complete
 .gcc-flags.json
 .vscode
