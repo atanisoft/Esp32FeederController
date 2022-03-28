@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2022 Mike Dunston (atanisoft)
+ *
+ * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ */
+
 #include <asio.hpp>
 #include <esp_netif.h>
 #include <esp_ota_ops.h>

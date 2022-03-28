@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2022 Mike Dunston (atanisoft)
+ *
+ * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ */
 
 #include <esp_netif_types.h>
 #include "WiFiManager.hxx"
