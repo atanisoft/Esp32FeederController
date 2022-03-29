@@ -51,7 +51,7 @@ private:
     static constexpr const char * const COMMAND_OK = "ok";
 
     /// Prefix for responses that contain a failure.
-    static constexpr const char * const COMMAND_ERROR = "error";
+    static constexpr const char * const COMMAND_ERROR = "error:";
 
     GCodeServer(const GCodeServer &) = delete;
     GCodeServer &operator=(const GCodeServer &) = delete;

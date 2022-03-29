@@ -199,26 +199,26 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
             // automatic discard of certain commands that are not implemented
             // or needed with the feeder.
             reply = COMMAND_OK;
-            reply.append(" ; not implemented");
+            reply.append(" - not implemented");
         }
         else if (command == "M115")
         {
             // If the command is M115 send back firmware details.
-            // NOTE: For M115 the "ok" ACK should be at the end of the string
-            // rather than the front!
+            // NOTE: For M115 the "ok" ACK should be on it's own line after the
+            // firmware details!
             const esp_app_desc_t *app_data = esp_ota_get_app_description();
             reply.reserve(128);
             reply.append(" ");
-            reply.append("FIRMWARE_NAME:Esp32SlottedFeeder (");
+            reply.append("FIRMWARE_NAME:Esp32FeederController (");
             reply.append(app_data->version);
-            reply.append(") ");
+            reply.append(")\n");
             reply.append(COMMAND_OK);
 
         }
         else
         {
-            reply = "error invalid command token: ";
-            reply.append(command);
+            reply = COMMAND_OK;
+            reply.append(" - invalid command token: ").append(command);
         }
     }
     reply.append("\n");

@@ -66,7 +66,16 @@ public:
     /// @param channel to return status of.
     ///
     /// @return true if the channel is HIGH, false if the channel is LOW.
-    bool state(uint8_t channel);
+    bool state(uint8_t channel)
+    {
+        // If the channel is 0-7 it uses the first port.
+        if (channel < 8)
+        {
+            return state_[0] & (1 << channel);
+        }
+        // channel 8-15 use the second port.
+        return state_[1] & (1 << (channel - 8));
+    }
 
     /// maximum number of PWM channels supported by the MCP23017.
     static constexpr size_t NUM_CHANNELS = 16;

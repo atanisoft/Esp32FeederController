@@ -178,11 +178,17 @@ private:
         POSITION_RETRACTED
     } feeder_position_t;
 
+    /// Size of the persistent configuration data.
+    static constexpr std::size_t configsize_ = sizeof(feeder_config_t);
+
     /// Feeder index number in relation to all other feeders.
     const std::size_t id_;
 
     /// Unique ID for this feeder.
     const uint32_t uuid_;
+
+    /// Unique NVS key used for persistent configuration storage.
+    std::string nvskey_;
 
     /// PCA9685 instance to use for this feeder.
     std::shared_ptr<PCA9685> pca9685_;

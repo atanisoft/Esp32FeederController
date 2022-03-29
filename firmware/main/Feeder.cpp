@@ -36,14 +36,14 @@ Feeder::Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
 
 void Feeder::configure()
 {
-    size_t config_size = sizeof(feeder_config_t);
+    size_t config_size = configsize_;
     nvs_handle_t nvs;
-    std::string nvs_key = "feeder-";
-    nvs_key.append(to_hex(uuid_));
+    nvskey_ = "feeder-";
+    nvskey_.append(to_hex(uuid_));
 
     ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
-    esp_err_t res = nvs_get_blob(nvs, nvs_key.c_str(), &config_, &config_size);
-    if (config_size != sizeof(feeder_config_t) || res != ESP_OK)
+    esp_err_t res = nvs_get_blob(nvs, nvskey_.c_str(), &config_, &config_size);
+    if (config_size != configsize_ || res != ESP_OK)
     {
         ESP_LOGW(TAG,
                  "[%s:%zu] Configuration not found or corrupt, rebuilding..",
@@ -66,8 +66,7 @@ void Feeder::configure()
         }
 
         ESP_ERROR_CHECK(
-            nvs_set_blob(nvs, nvs_key.c_str(), &config_,
-                         sizeof(feeder_config_t)));
+            nvs_set_blob(nvs, nvskey_.c_str(), &config_, configsize_));
         ESP_ERROR_CHECK(nvs_commit(nvs));
     }
     nvs_close(nvs);
@@ -209,11 +208,11 @@ void Feeder::configure(uint8_t advance_angle, uint8_t half_advance_angle,
 
     if (need_persist)
     {
+        nvs_handle_t nvs;
         // persist the updated configuration
         ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
         ESP_ERROR_CHECK(
-            nvs_set_blob(nvs, nvs_key.c_str(), &config_,
-                         sizeof(feeder_config_t)));
+            nvs_set_blob(nvs, nvskey_.c_str(), &config_, configsize_));
         ESP_ERROR_CHECK(nvs_commit(nvs));
         nvs_close(nvs);
     }
