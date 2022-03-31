@@ -65,7 +65,7 @@ bool WiFiManager::start()
     if (!password_.empty())
     {
         strncpy(reinterpret_cast<char *>(conf.sta.password),
-                sizeof(conf.sta.password), password_.c_str());
+                password_.c_str(), sizeof(conf.sta.password));
     }
 
     ESP_LOGI(TAG, "Configuring Station (SSID:%s)", conf.sta.ssid);
