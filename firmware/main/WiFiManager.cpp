@@ -60,11 +60,12 @@ bool WiFiManager::start()
 
     wifi_config_t conf;
     memset(&conf, 0, sizeof(wifi_config_t));
-    strcpy(reinterpret_cast<char *>(conf.sta.ssid), ssid_.c_str());
+    strncpy(reinterpret_cast<char *>(conf.sta.ssid), ssid_.c_str(),
+            sizeof(conf.sta.ssid));
     if (!password_.empty())
     {
-        strcpy(reinterpret_cast<char *>(conf.sta.password),
-               password_.c_str());
+        strncpy(reinterpret_cast<char *>(conf.sta.password),
+                sizeof(conf.sta.password), password_.c_str());
     }
 
     ESP_LOGI(TAG, "Configuring Station (SSID:%s)", conf.sta.ssid);
