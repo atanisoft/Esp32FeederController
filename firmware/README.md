@@ -4,12 +4,14 @@ The Esp32FeederController is built using two PCA9685 PWM generators and two
 MCP23017 IO Expander ICs. The [custom PCB](../pcb/FeederController/) allows
 control of up to 32 feeders with a single PCB.
 
-# Configuring your build environment
+## Configuring your build environment
 
 Esp32FeederController is built using [ESP-IDF](https://github.com/espressif/esp-idf),
 most testing is done with the master branch (v5.0 or later) but earlier stable
 versions should work as well. Please follow [these](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#installation)
 instructions for setting up your build environment.
+
+## Building and flashing the firmware
 
 Once the environment has been setup you are almost ready to build and upload the
 binary to the ESP32. Before building you will need to configure your WiFi access
@@ -44,13 +46,3 @@ I (2114) gcode_server: Waiting for connections on 10.0.0.13:8989...
 ```
 Make note of the IP address that is reported as you will need it for OpenPnP
 configuration.
-
-
-## Missing Functionality (To-do list)
-
-The following functionality has not yet been implemented and may or may not be
-needed in your specific setup:
-
-* Manual advancement of tape by pressing the tape tension arm down to open and
-close the feedback line.
-* SoftAP and configuration web portal.

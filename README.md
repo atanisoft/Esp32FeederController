@@ -129,7 +129,7 @@ arguments.
 
 ### Feeder Configuration (M613)
 
-`M613 N{feeder} [A{advance angle}] [B{half advance angle}] [C{retract angle}] [F{feed length}] [U{settle time}] [V{min pulse}] [W{max pulse}] [Z{feedback enabled}]`
+`M613 N{feeder} [A{advance angle}] [B{half advance angle}] [C{retract angle}] [D{degrees}] [F{feed length}] [S{speed}] [U{settle time}] [V{min pulse}] [W{max pulse}] [Z{feedback enabled}]`
 
 All parameters except `{feeder}` are optional.
 
@@ -137,11 +137,13 @@ All parameters except `{feeder}` are optional.
 * `{advance angle}` is the angle to move the servo to for full extension.
 * `{half advance angle}` is the angle to move the servo to for half extension.
 * `{retract angle}` is the angle to move the servo to for retraction.
+* `{degrees}` is the maximum number of degrees to move at one time, set to zero to move immediately.
 * `{feed length}` is the number of millimeters (pitch) to move the feeder forward when moving to the next part and must be a multiple of 2.
+* `{speed}` is the interval at which to move the servo between two angles, used in conjunction with `{degrees}`.
 * `{settle time}` is the number of milliseconds to delay between servo movements.
 * `{min pulse}` is the minimum number of pulses to send the servo.
 * `{max pulse}` is the maximum number of pulses to send the servo.
-* `{feedback enabled}` is used to enable or disable feedback checking as part of movement, set to zero to disable or one to enable.
+* `{feedback enabled}` is used to enable or disable feedback checking as part of movement, set to zero to disable or one to enable
 
 ### Enable Feeder (M614)
 

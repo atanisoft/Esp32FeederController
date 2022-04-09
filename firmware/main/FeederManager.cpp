@@ -280,8 +280,10 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
     ESP_LOGI(TAG, "feeder reconfigure request received");
     uint8_t feeder = -1;
     int8_t feedback_enabled = -1;
-    int16_t advance_angle = 0, half_advance_angle = 0, retract_angle = 0;
-    uint16_t feed_length = 0, settle_time = 0, min_pulse = 0, max_pulse = 0;
+    int16_t advance_angle = 0, half_advance_angle = 0, retract_angle = 0,
+            movement_speed = -1;
+    uint16_t feed_length = 0, settle_time = 0, min_pulse = 0, max_pulse = 0,
+             movement_degrees = 0;
 
     if (!extract_arg("N", args, feeder) || feeder > feeders_.size())
     {
@@ -294,6 +296,8 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
     extract_arg("A", args, advance_angle);
     extract_arg("B", args, half_advance_angle);
     extract_arg("C", args, retract_angle);
+    extract_arg("D", args, movement_degrees);
+    extract_arg("S", args, movement_speed);
     extract_arg("U", args, settle_time);
     extract_arg("V", args, min_pulse);
     extract_arg("W", args, max_pulse);
@@ -301,7 +305,8 @@ GCodeServer::command_return_type FeederManager::feeder_configure(GCodeServer::co
     
     feeders_[feeder]->configure(advance_angle, half_advance_angle,
                                 retract_angle, feed_length, settle_time,
-                                min_pulse, max_pulse, feedback_enabled);
+                                min_pulse, max_pulse, feedback_enabled,
+                                movement_speed, movement_degrees);
 
     return std::make_pair(true, feeders_[feeder]->status());
 }

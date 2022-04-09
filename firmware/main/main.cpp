@@ -20,6 +20,12 @@
 #include "Utils.hxx"
 #include "SocInfo.hxx"
 
+// Compile time validation of configuration parameters
+static_assert(__builtin_strlen(WIFI_SSID) > 0,
+              "WiFi SSID must not be blank");
+static_assert(__builtin_strlen(WIFI_HOSTNAME) < 32,
+              "Hostname length must not exceed 32 characters");
+
 static WiFiManager wifi(WIFI_SSID, WIFI_PASSWORD, WIFI_HOSTNAME);
 
 static void worker_task(asio::io_context &context)

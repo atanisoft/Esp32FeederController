@@ -77,6 +77,17 @@ public:
         return state_[1] & (1 << (channel - 8));
     }
 
+    /// Subscribes to state change notifications for a single IO pin.
+    ///
+    /// @param channel to subscribe to.
+    /// @param callback Callback to invoke upon state change.
+    ///
+    /// Signature for @param callback is: void function(bool state).
+    void subscribe(uint8_t channel, std::function<void(bool)> callback)
+    {
+        callbacks_[channel] = std::move(callback);
+    }
+
     /// maximum number of PWM channels supported by the MCP23017.
     static constexpr size_t NUM_CHANNELS = 16;
 
@@ -84,7 +95,8 @@ private:
     /// Log tag to use for this class.
     static constexpr const char *const TAG = "MCP23017";
 
-    static constexpr std::size_t POLLING_INTERVAL_MS = 100;
+    /// Interval at which to poll the current state of the IO pins.
+    static constexpr std::size_t POLLING_INTERVAL_MS = 50;
 
     /// Device register offsets.
     enum REGISTERS
@@ -105,7 +117,6 @@ private:
         OUTPUT_B = 0x15
     };
 
-
     /// I2C device address for this device.
     uint8_t addr_;
 
@@ -114,6 +125,9 @@ private:
 
     /// Last known states of the IO pins.
     uint8_t state_[2];
+
+    /// Collection of callbacks to invoke when state has changed.
+    std::function<void(bool)> callbacks_[NUM_CHANNELS];
 
     /// Background timer instance.
     asio::system_timer timer_;
@@ -125,9 +139,39 @@ private:
     {
         if (!error)
         {
+            // read the current state of IO pins using a local storage so we
+            // can compare it after reading with last reading.
+            uint8_t state[2];
             ESP_ERROR_CHECK_WITHOUT_ABORT(
-                i2c_.readBytes(addr_, INPUT_A, 2, state_));
+                i2c_.readBytes(addr_, INPUT_A, 2, state));
 
+            // verify if there are any state changes that are interesting to
+            // subscribers.
+            for (std::size_t index = 0; index < 8; index++)
+            {
+                // check first eight inputs
+                if ((state[0] & (1 << index)) != (state_[0] & (1 << index)))
+                {
+                    if (callbacks_[index])
+                    {
+                        callbacks_[index](state[0] & (1 << index));
+                    }
+                }
+
+                // check second eight inputs
+                if ((state[1] & (1 << index)) != (state_[1] & (1 << index)))
+                {
+                    if (callbacks_[index + 8])
+                    {
+                        callbacks_[index + 8](state[1] & (1 << index));
+                    }
+                }
+            }
+            // stash the newly updated state.
+            state_[0] = state[0];
+            state_[1] = state[1];
+
+            // reset the timer to call this function again after the timeout.
             timer_.expires_from_now(
                 std::chrono::milliseconds(POLLING_INTERVAL_MS));
             timer_.async_wait(std::bind(&MCP23017::update, shared_from_this(),
