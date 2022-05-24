@@ -1,3 +1,8 @@
-When ordering add this to the comments for the PCB:
+Make sure to select 0.8mm thick PCB
+
+You will need a thin PCB cut along the silkscreen lines with tin snips or scissors.
+If those silkscreen lines were V-CUT it would cost more than triple the price due to the small PCB size.
+
+And, add this to the comments for the PCB:
 
 Please V-CUT as indicated in the Eco1_User gerber file.
