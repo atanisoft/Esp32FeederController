@@ -9,6 +9,11 @@ At this time the following feeder designs should work:
 
 * [Original 0816 Feeder](https://docs.mgrl.de/maschine:pickandplace:feeder:0816feeder).
 * [0816 Lumen Feeder](https://github.com/SupaCoder/0816-Lumen-SMT-Feeder-Remix).
+* [Max Feeder Shield](https://github.com/CurlyTaleGamesLLC/MAXFeederShield).
+
+The [Max Feeder Shield](https://github.com/CurlyTaleGamesLLC/MAXFeederShield) is the
+preferred version of the feeder design as it supports adding a QR Code to the feeder
+that can be used for automatic part identification.
 
 ### Feeder modifications / Addons
 
