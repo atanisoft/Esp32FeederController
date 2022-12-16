@@ -125,7 +125,7 @@ extern "C" void app_main()
         std::string name = "worker-";
         name.append(std::to_string(id));
         cfg.thread_name = name.c_str();
-        cfg.pin_to_core = id;
+        cfg.pin_to_core = id % 2;
         esp_pthread_set_cfg(&cfg);
 
         // Create the worker thread which passes in the asio::io_context by
