@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <asio.hpp>
+#include <esp_chip_info.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>
@@ -13,6 +14,7 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <string>
+
 #include "config.hxx"
 #include "FeederManager.hxx"
 #include "WiFiManager.hxx"
@@ -46,9 +48,24 @@ static void worker_task(asio::io_context &context)
     }
 }
 
-extern "C" void app_main()
+extern "C"
 {
-    const esp_app_desc_t *app_data = esp_ota_get_app_description();
+
+/*
+workaround for:
+xtensa-esp32-elf/bin/ld: esp-idf/espressif__asio/libespressif__asio.a(asio.cpp.obj):(.literal._ZN4asio6detail10socket_ops9inet_ntopEiPKvPcjmRSt10error_code+0x8): undefined reference to `if_indextoname'
+xtensa-esp32-elf/bin/ld: esp-idf/espressif__asio/libespressif__asio.a(asio.cpp.obj): in function `_ZN4asio6detail10socket_ops9inet_ntopEiPKvPcjmRSt10error_code':
+Esp32FeederController/firmware/managed_components/espressif__asio/asio/asio/include/asio/detail/impl/socket_ops.ipp:2128: undefined reference to `if_indextoname'
+collect2: error: ld returned 1 exit status
+
+Per https://github.com/espressif/esp-idf/issues/3557 this should have been
+fixed but it appears to be showing up on IDF v5.x with external asio component.
+*/
+__attribute__((weak)) char* if_indextoname(unsigned int, char*) { return 0; }
+
+void app_main()
+{
+    const esp_app_desc_t *app_data = esp_app_get_description();
     const esp_partition_t *running_from = esp_ota_get_running_partition();
     const char *const TAG = "main";
     esp_chip_info_t chip_info;
@@ -141,3 +158,5 @@ extern "C" void app_main()
         worker.join();
     }
 }
+
+} // extern "C"

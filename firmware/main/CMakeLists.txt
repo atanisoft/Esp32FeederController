@@ -1,8 +1,10 @@
 set(IDF_DEPS
     app_update
-    asio
     driver
+    esp_hw_support
+    esp_netif
     esp_system
+    esp_wifi
     heap
     nvs_flash
     pthread

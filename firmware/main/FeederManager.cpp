@@ -12,9 +12,10 @@
 #include <string>
 
 #include "config.hxx"
-#include "GCodeServer.hxx"
 #include "FeederManager.hxx"
+#include "GCodeServer.hxx"
 #include "I2Cbus.hxx"
+#include "Utils.hxx"
 
 using std::string;
 using std::transform;
@@ -73,16 +74,18 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
     {
         if (i2c_.testConnection(addr) == ESP_OK)
         {
-            pca9685_.push_back(std::make_shared<PCA9685>(i2c_));
-            if (pca9685_.back()->configure(addr, PCA9685_FREQUENCY) != ESP_OK)
+            auto pca9685 = std::make_shared<PCA9685>(i2c_);
+            if (pca9685->configure(addr, PCA9685_FREQUENCY) != ESP_OK)
             {
-                ESP_LOGW(TAG, "PCA9685(%02x) configuration failed!", addr);
-                pca9685_.pop_back();
+                ESP_LOGW(TAG, "PCA9685(%02x) configuration failed!",
+                         pca9685->get_address());
             }
             else
             {
-                ESP_LOGI(TAG, "PCA9685(%02x/%p) configured for use.", addr,
-                         pca9685_.back().get());
+                ESP_LOGI(TAG, "PCA9685(%02x/%p) configured for use.",
+                         pca9685->get_address(),
+                         pca9685.get());
+                pca9685_.push_back(std::move(pca9685));
             }
         }
         else
@@ -98,16 +101,18 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
     {
         if (i2c_.testConnection(addr) == ESP_OK)
         {
-            mcp23017_.push_back(std::make_shared<MCP23017>(i2c_, context));
-            if (mcp23017_.back()->configure(addr) != ESP_OK)
+            auto mcp23017 = std::make_shared<MCP23017>(i2c_, context);
+            if (mcp23017->configure(addr) != ESP_OK)
             {
-                ESP_LOGW(TAG, "MCP23017(%02x) configuration failed!", addr);
-                mcp23017_.pop_back();
+                ESP_LOGW(TAG, "MCP23017(%02x) configuration failed!",
+                         mcp23017->get_address());
             }
             else
             {
-                ESP_LOGI(TAG, "MCP23017(%02x/%p) configured for use.", addr,
-                         mcp23017_.back().get());
+                ESP_LOGI(TAG, "MCP23017(%02x/%p) configured for use.",
+                         mcp23017->get_address(),
+                         mcp23017.get());
+                mcp23017_.push_back(std::move(mcp23017));
             }
         }
         else
@@ -120,31 +125,50 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
     // of PCA9685 chips that were detected and configured.
     std::size_t available_feeder_count =
         std::min(MAX_FEEDER_COUNT, pca9685_.size() * PCA9685::NUM_CHANNELS);
+    ESP_LOGI(TAG, "Attempting to create %zu feeders", available_feeder_count);
+    ESP_LOGI(TAG, "Detected %zu PCA9685 and %zu MCP23017", pca9685_.size(),
+             mcp23017_.size());
     for (size_t idx = 0; idx < available_feeder_count; idx++)
     {
         auto expander_index = idx / PCA9685::NUM_CHANNELS;
         auto expander_channel = idx % PCA9685::NUM_CHANNELS;
         uint32_t uuid = config.feeder_uuid[idx];
-        if (mcp23017_.size() > expander_index)
+        std::shared_ptr<Feeder> feeder = nullptr;
+        if (mcp23017_.size() > expander_index &&
+            mcp23017_[expander_index].get() != nullptr)
         {
-            feeders_.push_back(
+            ESP_LOGI(TAG,
+                     "Creating feeder %s (%zu/%zu/%zu/PCA:%p/MCP:%p)",
+                     to_hex(uuid).c_str(), idx + 1, expander_index,
+                     expander_channel, pca9685_[expander_index].get(),
+                     mcp23017_[expander_index].get());
+            feeder =
                 std::make_shared<Feeder>(idx + 1, uuid,
-                                        pca9685_[expander_index],
-                                        mcp23017_[expander_index],
-                                        expander_channel, context));
+                                         pca9685_[expander_index],
+                                         expander_channel, context,
+                                         mcp23017_[expander_index]);
         }
         else
         {
-            feeders_.push_back(
+            ESP_LOGI(TAG,
+                     "Creating feeder %s (%zu/%zu/%zu/PCA:%p)",
+                     to_hex(uuid).c_str(), idx + 1, expander_index,
+                     expander_channel, pca9685_[expander_index].get());
+            feeder =
                 std::make_shared<Feeder>(idx + 1, uuid,
-                                        pca9685_[expander_index],
-                                        expander_channel, context));
+                                         pca9685_[expander_index],
+                                         expander_channel, context);
         }
+
+        feeder->initialize();
 
         if (AUTO_ENABLE_FEEDERS)
         {
-            feeders_.back()->enable();
+            ESP_LOGI(TAG, "Enabling feeder %s (%zu)",
+                     to_hex(uuid).c_str(), idx + 1);
+            feeder->enable();
         }
+        feeders_.push_back(std::move(feeder));
     }
     ESP_LOGI(TAG, "Configured Feeders:%zu", feeders_.size());
 }

@@ -26,19 +26,12 @@ public:
     ///
     /// @param uuid Unique identifier for this feeder.
     /// @param pca9685 @ref PCA9685 to use for this feeder.
+    /// @param channel @ref IO Expander channel assigned to this feeder.
+    /// @param context @ref asio::io_context to use for this feeder.
     /// @param mcp23017 @ref MCP23017 to use for this feeder.
-    /// @param channel @ref IO Expander channel assigned to this feeder.
     Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-           std::shared_ptr<MCP23017> mcp23017, uint8_t channel,
-           asio::io_context &context);
-
-    /// Constructor.
-    ///
-    /// @param uuid Unique identifier for this feeder.
-    /// @param pca9685 @ref PCA9685 to use for this feeder.
-    /// @param channel @ref IO Expander channel assigned to this feeder.
-    Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-           uint8_t channel, asio::io_context &context);
+           uint8_t channel, asio::io_context &context,
+           std::shared_ptr<MCP23017> mcp23017 = nullptr);
 
     /// Instructs the feeder to move to a retracted position.
     ///
@@ -123,6 +116,10 @@ public:
     ///
     /// @param state State of the IO pin.
     void feedback_state_changed(bool state);
+
+    /// Loads configuration for the feeder and starts listening for feedback, if
+    /// enabled.
+    void initialize();
 
 private:
     /// Log tag to use for this class.
@@ -252,9 +249,6 @@ private:
 
     /// Mutex protecting configuration, status, etc.
     std::mutex mux_;
-
-    /// Loads persistent configuration and configures the feeder for use.
-    void configure();
 
     /// Callback from @ref timer_ used to handle post-movement actions such as
     /// continuing movement or turning off the servo.

@@ -1,6 +1,8 @@
 firmware/build
+firmware/dependencies.lock
 firmware/sdkconfig
 firmware/sdkconfig.old
+firmware/managed_components
 pcb/_autosave*
 pcb/*.kicad_sche
 pcb/FeederController-backups/

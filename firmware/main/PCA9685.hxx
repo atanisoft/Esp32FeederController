@@ -44,8 +44,8 @@ public:
         // ensure the PWM frequency is within normal range.
         if (frequency > (INTERNAL_CLOCK_FREQUENCY / (4096 * 4)))
         {
-            ESP_LOGE(TAG, "[%02x] Invalid PWM frequency provided: %d", address,
-                     frequency);
+            ESP_LOGE(TAG, "[%02x] Invalid PWM frequency provided: %" PRIu32,
+                     address, frequency);
             return ESP_ERR_INVALID_ARG;
         }
 
@@ -161,7 +161,7 @@ public:
                               const uint16_t min_servo_angle = 0,
                               const uint16_t max_servo_angle = 180)
     {
-        ESP_LOGI(TAG, "[%02x:%d] Moving to %d deg", addr_, channel, angle);
+        ESP_LOGI(TAG, "[%02x:%d] Moving to %" PRIu16 " deg", addr_, channel, angle);
         const uint16_t pulse_count_range = max_pulse_count - min_pulse_count;
         const uint16_t target_angle =
             std::max(std::min(angle, max_servo_angle), min_servo_angle);
@@ -169,6 +169,11 @@ public:
             (pulse_count_range * target_angle) / max_servo_angle +
             min_pulse_count;
         return set_pwm(channel, pulse_count);
+    }
+
+    uint8_t get_address() const
+    {
+        return addr_;
     }
 
     /// maximum number of PWM channels supported by the PCA9685.
