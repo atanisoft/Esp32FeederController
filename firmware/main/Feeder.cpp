@@ -18,77 +18,13 @@
 #include "Utils.hxx"
 
 Feeder::Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-               std::shared_ptr<MCP23017> mcp23017, uint8_t channel,
-               asio::io_context &context)
+           uint8_t channel, asio::io_context &context,
+           std::shared_ptr<MCP23017> mcp23017)
     : id_(id), uuid_(uuid), pca9685_(pca9685), mcp23017_(mcp23017),
       channel_(channel), timer_(context)
 {
-    mcp23017_->subscribe(channel,
-                         std::bind(&Feeder::feedback_state_changed,
-                                   shared_from_this(), std::placeholders::_1));
-    configure();
-}
-
-Feeder::Feeder(std::size_t id, uint32_t uuid, std::shared_ptr<PCA9685> pca9685,
-               uint8_t channel, asio::io_context &context)
-    : id_(id), uuid_(uuid), pca9685_(pca9685), channel_(channel),
-      timer_(context)
-{
-    configure();
-}
-
-void Feeder::configure()
-{
-    size_t config_size = configsize_;
-    nvs_handle_t nvs;
     nvskey_ = "feeder-";
     nvskey_.append(to_hex(uuid_));
-
-    memset(&config_, 0, configsize_);
-
-    ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
-    esp_err_t res = nvs_get_blob(nvs, nvskey_.c_str(), &config_, &config_size);
-    if (config_size != configsize_ || res != ESP_OK)
-    {
-        ESP_LOGW(TAG,
-                 "[%s:%zu] Configuration not found or corrupt, rebuilding..",
-                 to_hex(uuid_).c_str(), id_);
-
-        config_.feed_length = FEEDER_MECHANICAL_ADVANCE_LENGTH;
-        config_.settle_time_ms = DEFAULT_FEEDER_SETTLE_TIME_MS;
-        config_.movement_interval_ms = DEFAULT_FEEDER_MOVEMENT_INTERVAL_MS;
-        config_.servo_full_angle = DEFAULT_FEEDER_FULL_ADVANCE_ANGLE;
-        config_.servo_half_angle = DEFAULT_FEEDER_FULL_ADVANCE_ANGLE / 2;
-        config_.servo_retract_angle = DEFAULT_FEEDER_RETRACT_ANGLE;
-        config_.servo_min_pulse = DEFAULT_FEEDER_MIN_PULSE_COUNT;
-        config_.servo_max_pulse = DEFAULT_FEEDER_MAX_PULSE_COUNT;
-
-        // If the MCP23017 was not provided ignore feedback by default.
-        if (!mcp23017_)
-        {
-            config_.ignore_feedback = 1;
-        }
-
-        ESP_ERROR_CHECK(
-            nvs_set_blob(nvs, nvskey_.c_str(), &config_, configsize_));
-        ESP_ERROR_CHECK(nvs_commit(nvs));
-    }
-    nvs_close(nvs);
-
-    ESP_LOGI(TAG,
-             "[%s:%zu] Initializing using PCA9685 %p:%d",
-             to_hex(uuid_).c_str(), id_, pca9685_.get(), channel_);
-    if (mcp23017_ && !config_.ignore_feedback)
-    {
-        ESP_LOGI(TAG, "[%s:%zu] Feedback enabled using MCP23017 %p:%d",
-                 to_hex(uuid_).c_str(), id_, mcp23017_.get(), channel_);
-    }
-
-    // move the feeder to retracted position.
-    {
-        const std::lock_guard<std::mutex> lock(mux_);
-        retract_locked();
-    }
 }
 
 bool Feeder::move(uint8_t distance)
@@ -287,6 +223,63 @@ void Feeder::feedback_state_changed(bool state)
     else
     {
         advance_ = false;
+    }
+}
+
+void Feeder::initialize()
+{
+    size_t config_size = configsize_;
+    nvs_handle_t nvs;
+    memset(&config_, 0, configsize_);
+
+    ESP_ERROR_CHECK(nvs_open(NVS_FEEDER_NAMESPACE, NVS_READWRITE, &nvs));
+    esp_err_t res = nvs_get_blob(nvs, nvskey_.c_str(), &config_, &config_size);
+    if (config_size != configsize_ || res != ESP_OK)
+    {
+        ESP_LOGW(TAG,
+                 "[%s:%zu] Configuration not found or corrupt, rebuilding..",
+                 to_hex(uuid_).c_str(), id_);
+
+        config_.feed_length = FEEDER_MECHANICAL_ADVANCE_LENGTH;
+        config_.settle_time_ms = DEFAULT_FEEDER_SETTLE_TIME_MS;
+        config_.movement_interval_ms = DEFAULT_FEEDER_MOVEMENT_INTERVAL_MS;
+        config_.servo_full_angle = DEFAULT_FEEDER_FULL_ADVANCE_ANGLE;
+        config_.servo_half_angle = DEFAULT_FEEDER_FULL_ADVANCE_ANGLE / 2;
+        config_.servo_retract_angle = DEFAULT_FEEDER_RETRACT_ANGLE;
+        config_.servo_min_pulse = DEFAULT_FEEDER_MIN_PULSE_COUNT;
+        config_.servo_max_pulse = DEFAULT_FEEDER_MAX_PULSE_COUNT;
+
+        // If the MCP23017 was not provided ignore feedback by default.
+        if (!mcp23017_)
+        {
+            config_.ignore_feedback = 1;
+        }
+
+        ESP_ERROR_CHECK(
+            nvs_set_blob(nvs, nvskey_.c_str(), &config_, configsize_));
+        ESP_ERROR_CHECK(nvs_commit(nvs));
+    }
+    nvs_close(nvs);
+
+    ESP_LOGI(TAG,
+             "[%s:%zu] Initializing using PCA9685 %p:%d",
+             to_hex(uuid_).c_str(), id_, pca9685_.get(), channel_);
+
+    if (mcp23017_ && !config_.ignore_feedback)
+    {
+        ESP_LOGI(TAG, "[%s:%zu] Subscribing to MCP23017 channel %d",
+                 to_hex(uuid_).c_str(), id_, channel_);
+        mcp23017_->subscribe(channel_,
+                             std::bind(&Feeder::feedback_state_changed,
+                                       shared_from_this(), std::placeholders::_1));
+        ESP_LOGI(TAG, "[%s:%zu] Feedback enabled using MCP23017 %p:%d",
+                 to_hex(uuid_).c_str(), id_, mcp23017_.get(), channel_);
+    }
+
+    // move the feeder to retracted position.
+    {
+        const std::lock_guard<std::mutex> lock(mux_);
+        retract_locked();
     }
 }
 

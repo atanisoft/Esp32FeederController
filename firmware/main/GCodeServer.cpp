@@ -206,7 +206,7 @@ void GCodeServer::GCodeClient::process_line(std::string &line)
             // If the command is M115 send back firmware details.
             // NOTE: For M115 the "ok" ACK should be on it's own line after the
             // firmware details!
-            const esp_app_desc_t *app_data = esp_ota_get_app_description();
+            const esp_app_desc_t *app_data = esp_app_get_description();
             reply.reserve(128);
             reply.append(" ");
             reply.append("FIRMWARE_NAME:Esp32FeederController (");

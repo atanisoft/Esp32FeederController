@@ -88,6 +88,11 @@ public:
         callbacks_[channel] = std::move(callback);
     }
 
+    uint8_t get_address() const
+    {
+        return addr_;
+    }
+
     /// maximum number of PWM channels supported by the MCP23017.
     static constexpr size_t NUM_CHANNELS = 16;
 
