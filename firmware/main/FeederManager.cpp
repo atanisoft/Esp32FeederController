@@ -139,11 +139,11 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
         {
             ESP_LOGI(TAG,
                      "Creating feeder %s (%zu/%zu/%zu/PCA:%p/MCP:%p)",
-                     to_hex(uuid).c_str(), idx + 1, expander_index,
+                     to_hex(uuid).c_str(), idx, expander_index,
                      expander_channel, pca9685_[expander_index].get(),
                      mcp23017_[expander_index].get());
             feeder =
-                std::make_shared<Feeder>(idx + 1, uuid,
+                std::make_shared<Feeder>(idx, uuid,
                                          pca9685_[expander_index],
                                          expander_channel, context,
                                          mcp23017_[expander_index]);
@@ -152,10 +152,10 @@ FeederManager::FeederManager(GCodeServer &server, asio::io_context &context)
         {
             ESP_LOGI(TAG,
                      "Creating feeder %s (%zu/%zu/%zu/PCA:%p)",
-                     to_hex(uuid).c_str(), idx + 1, expander_index,
+                     to_hex(uuid).c_str(), idx, expander_index,
                      expander_channel, pca9685_[expander_index].get());
             feeder =
-                std::make_shared<Feeder>(idx + 1, uuid,
+                std::make_shared<Feeder>(idx, uuid,
                                          pca9685_[expander_index],
                                          expander_channel, context);
         }

@@ -7,8 +7,8 @@ control of up to 32 feeders with a single PCB.
 ## Configuring your build environment
 
 Esp32FeederController is built using [ESP-IDF](https://github.com/espressif/esp-idf),
-most testing is done with the master branch (v5.0 or later) but earlier stable
-versions should work as well. Please follow [these](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#installation)
+most testing is done with the master branch (v5.0 or later).
+Please follow [these](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#installation)
 instructions for setting up your build environment.
 
 ## Building and flashing the firmware
